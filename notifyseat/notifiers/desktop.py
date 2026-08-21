@@ -46,10 +46,21 @@ class DesktopNotifier(BaseNotifier):
         try:
             if os_type == "Linux":
                 if shutil.which("notify-send"):
+                    # Use synchronous replace hint and replace-id to avoid desktop spam & GDBus throttling
                     subprocess.run(
-                        ["notify-send", "-u", "critical", "-a", "NotifySeat", title, message],
+                        [
+                            "notify-send",
+                            "-u", "normal",
+                            "-a", "NotifySeat",
+                            "-h", "string:x-canonical-private-synchronous:notifyseat",
+                            "-r", "4242",
+                            title,
+                            message
+                        ],
                         check=False,
-                        timeout=5
+                        timeout=5,
+                        stderr=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL
                     )
                     return True
                 else:
@@ -58,12 +69,12 @@ class DesktopNotifier(BaseNotifier):
                     return True
             elif os_type == "Darwin":  # macOS
                 apple_script = f'display notification "{message}" with title "{title}" sound name "Glass"'
-                subprocess.run(["osascript", "-e", apple_script], check=False, timeout=5)
+                subprocess.run(["osascript", "-e", apple_script], check=False, timeout=5, stderr=subprocess.DEVNULL)
                 return True
             elif os_type == "Windows":
                 # Windows powershell toast fallback
                 ps_cmd = f'[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $textNodes = $template.GetElementsByTagName("text"); $textNodes.Item(0).AppendChild($template.CreateTextNode("{title}")) > $null; $textNodes.Item(1).AppendChild($template.CreateTextNode("{message}")) > $null; $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("NotifySeat"); $toast = [Windows.UI.Notifications.ToastNotification]::new($template); $notifier.Show($toast);'
-                subprocess.run(["powershell", "-Command", ps_cmd], check=False, timeout=5)
+                subprocess.run(["powershell", "-Command", ps_cmd], check=False, timeout=5, stderr=subprocess.DEVNULL)
                 return True
         except Exception as e:
             logger.warning(f"Desktop notification failed: {e}")
