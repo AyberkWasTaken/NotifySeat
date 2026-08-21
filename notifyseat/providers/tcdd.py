@@ -158,6 +158,48 @@ class TCDDProvider(BaseProvider):
             error_message="TCDD WAF blocked direct request (403 Forbidden)"
         )
 
+    def _get_netscaler_cookies(self, force_refresh: bool = False) -> Dict[str, str]:
+        """Manages Citrix NetScaler session cookies to bypass WAF bot checks."""
+        import os
+        import json
+        import time
+        from pathlib import Path
+
+        session_file = Path.home() / ".notifyseat" / "netscaler_session.json"
+        if not force_refresh and session_file.exists():
+            try:
+                with open(session_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if time.time() - data.get("timestamp", 0) < 3600:
+                        return data.get("cookies", {})
+            except Exception:
+                pass
+
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-blink-features=AutomationControlled"]
+                )
+                context = browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    locale="tr-TR"
+                )
+                page = context.new_page()
+                page.goto(self.BOOKING_URL, wait_until="commit", timeout=15000)
+                time.sleep(2)
+                cookies = {c["name"]: c["value"] for c in context.cookies()}
+                browser.close()
+
+                session_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(session_file, "w", encoding="utf-8") as f:
+                    json.dump({"timestamp": time.time(), "cookies": cookies}, f)
+                return cookies
+        except Exception as e:
+            logger.debug(f"Could not refresh NetScaler session: {e}")
+            return {}
+
     def _check_via_ytp_api(
         self,
         task: TrackingTask,
@@ -167,9 +209,12 @@ class TCDDProvider(BaseProvider):
         dest_id: int,
         custom_token: Optional[str] = None
     ) -> Optional[CheckResult]:
-        """Calls modern YTP API with bearer authentication."""
+        """Calls modern YTP API with bearer authentication and NetScaler session cookies."""
+        cookies_dict = self._get_netscaler_cookies()
+        cookie_header = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()]) if cookies_dict else ""
+
         headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Origin": "https://ebilet.tcddtasimacilik.gov.tr",
             "Referer": "https://ebilet.tcddtasimacilik.gov.tr/",
             "Content-Type": "application/json;charset=UTF-8",
@@ -177,6 +222,8 @@ class TCDDProvider(BaseProvider):
             "channelId": "3",
             "Accept": "application/json, text/plain, */*"
         }
+        if cookie_header:
+            headers["Cookie"] = cookie_header
 
         payload = {
             "departureStationId": origin_id,
