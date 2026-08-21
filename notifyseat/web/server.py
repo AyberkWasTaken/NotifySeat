@@ -168,12 +168,40 @@ class NotifySeatHTTPHandler(http.server.BaseHTTPRequestHandler):
                 current_cfg["desktop"].update(body["desktop"])
             if "email" in body:
                 current_cfg["email"].update(body["email"])
+            if "tcdd_token" in body:
+                current_cfg["tcdd_token"] = body["tcdd_token"].strip().replace("Bearer ", "")
             
             from notifyseat.core.config import AppConfig
             new_cfg = AppConfig.from_dict(current_cfg)
             self.config_mgr.save(new_cfg)
             self.notifier_mgr.reload(new_cfg)
             self._send_json({"success": True})
+            return
+
+        if path == "/api/tcdd/connect":
+            # 1-Click Connect TCDD
+            token = body.get("token", "").strip().replace("Bearer ", "")
+            if not token:
+                # Try discovery from known production tokens or Playwright
+                from notifyseat.providers.tcdd import TCDDProvider
+                provider = TCDDProvider()
+                token = provider.JWT_TOKENS[0] if provider.JWT_TOKENS else ""
+
+            cfg = self.config_mgr.get()
+            if token:
+                cfg.tcdd_token = token
+                self.config_mgr.save(cfg)
+                self._send_json({"success": True, "connected": True, "token": token[:30] + "..."})
+            else:
+                self._send_json({"success": False, "connected": False, "error": "Could not auto-connect TCDD"})
+            return
+
+        if path == "/api/tcdd/set-token":
+            token = body.get("token", "").strip().replace("Bearer ", "")
+            cfg = self.config_mgr.get()
+            cfg.tcdd_token = token
+            self.config_mgr.save(cfg)
+            self._send_json({"success": True, "connected": bool(token)})
             return
 
         if path == "/api/test-notify":

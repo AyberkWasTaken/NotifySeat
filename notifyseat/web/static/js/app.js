@@ -388,12 +388,88 @@ async function handleCreateTask(e) {
   }
 }
 
-// --- Settings ---
+// --- Settings & TCDD Connection ---
+
+async function handleConnectTCDD() {
+  const btnHeader = document.getElementById('btnConnectTcddHeader');
+  const btnModal = document.getElementById('btnAutoConnectTcdd');
+  const statusText = document.getElementById('tcddStatusText');
+
+  if (btnHeader) btnHeader.innerText = '⏳ Connecting...';
+  if (btnModal) btnModal.innerText = '⏳ Connecting...';
+  if (statusText) statusText.innerText = 'Status: Authenticating session...';
+
+  try {
+    const tokenInput = document.getElementById('cfgTcddToken');
+    const token = tokenInput ? tokenInput.value : '';
+
+    const res = await fetch('/api/tcdd/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      if (btnHeader) {
+        btnHeader.innerText = '✔ TCDD Connected';
+        btnHeader.className = 'btn btn-success';
+      }
+      if (btnModal) {
+        btnModal.innerText = '✔ TCDD Connected';
+        btnModal.className = 'btn btn-success';
+      }
+      if (statusText) {
+        statusText.innerText = 'Status: Connected (Active Session)';
+        statusText.style.color = 'var(--accent-green)';
+      }
+      if (tokenInput && data.token) {
+        tokenInput.value = data.token;
+      }
+      appendLog('⚡ TCDD session connected successfully. Live real-time checking active.', 'log-alert');
+    } else {
+      if (btnHeader) btnHeader.innerText = '⚡ Connect TCDD';
+      if (btnModal) btnModal.innerText = '⚡ 1-Click Connect TCDD';
+      if (statusText) statusText.innerText = 'Status: Connection Failed';
+      alert('Could not auto-connect TCDD. Please paste token or try again.');
+    }
+  } catch (err) {
+    if (btnHeader) btnHeader.innerText = '⚡ Connect TCDD';
+    if (btnModal) btnModal.innerText = '⚡ 1-Click Connect TCDD';
+    if (statusText) statusText.innerText = 'Status: Error';
+  }
+}
 
 async function loadSettings() {
   try {
     const res = await fetch('/api/config');
     const cfg = await res.json();
+
+    const tcddToken = cfg.tcdd_token || '';
+    const tokenInput = document.getElementById('cfgTcddToken');
+    if (tokenInput) tokenInput.value = tcddToken;
+
+    const btnHeader = document.getElementById('btnConnectTcddHeader');
+    const statusText = document.getElementById('tcddStatusText');
+    if (tcddToken) {
+      if (btnHeader) {
+        btnHeader.innerText = '✔ TCDD Connected';
+        btnHeader.className = 'btn btn-success';
+      }
+      if (statusText) {
+        statusText.innerText = 'Status: Connected (Active Session)';
+        statusText.style.color = 'var(--accent-green)';
+      }
+    } else {
+      if (btnHeader) {
+        btnHeader.innerText = '⚡ Connect TCDD';
+        btnHeader.className = 'btn btn-warning';
+      }
+      if (statusText) {
+        statusText.innerText = 'Status: Not Connected (Click 1-Click Connect)';
+        statusText.style.color = 'var(--text-muted)';
+      }
+    }
 
     document.getElementById('cfgTelegramToken').value = cfg.telegram.bot_token || '';
     document.getElementById('cfgTelegramChatId').value = cfg.telegram.chat_id || '';
@@ -417,6 +493,7 @@ async function loadSettings() {
 async function handleSaveSettings(e) {
   e.preventDefault();
   const payload = {
+    tcdd_token: document.getElementById('cfgTcddToken') ? document.getElementById('cfgTcddToken').value : '',
     telegram: {
       enabled: document.getElementById('cfgTelegramEnabled').checked,
       bot_token: document.getElementById('cfgTelegramToken').value,
@@ -449,6 +526,7 @@ async function handleSaveSettings(e) {
 
   alert('Settings saved successfully!');
   closeModal('modalSettings');
+  loadSettings();
 }
 
 async function testNotification(channel) {

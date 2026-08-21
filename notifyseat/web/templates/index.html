@@ -27,6 +27,9 @@
         <button id="btnToggleEngine" class="btn btn-success" onclick="toggleEngine()">
           ▶ Start Engine
         </button>
+        <button id="btnConnectTcddHeader" class="btn btn-warning" onclick="handleConnectTCDD()">
+          ⚡ Connect TCDD
+        </button>
         <button class="btn btn-primary" onclick="openNewTaskModal()">
           + Add Route
         </button>
@@ -199,6 +202,24 @@
 
       <form id="settingsForm" onsubmit="handleSaveSettings(event)">
         
+        <!-- TCDD Live Authentication -->
+        <h4 style="color: var(--accent-yellow); margin-bottom: 0.5rem;">🚆 TCDD Live Authentication & Session</h4>
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+            Auto-connect or paste your TCDD web session token to bypass Cloudflare/WAF bot restrictions and query authentic live seat counts.
+          </p>
+          <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.75rem;">
+            <button type="button" id="btnAutoConnectTcdd" class="btn btn-warning" onclick="handleConnectTCDD()">
+              ⚡ 1-Click Connect TCDD
+            </button>
+            <span id="tcddStatusText" style="font-size: 0.85rem; color: var(--text-muted);">Status: Checking...</span>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.8rem;">Session Bearer Token</label>
+            <input type="text" class="form-control" id="cfgTcddToken" placeholder="eyJhbGciOiJSUzI1NiIs..." style="font-size: 0.8rem; font-family: monospace;">
+          </div>
+        </div>
+
         <!-- Telegram -->
         <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem;">📱 Telegram Bot Settings</h4>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
