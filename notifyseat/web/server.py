@@ -178,30 +178,19 @@ class NotifySeatHTTPHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"success": True})
             return
 
-        if path == "/api/tcdd/connect":
-            # 1-Click Connect TCDD
+        if path == "/api/tcdd/connect" or path == "/api/tcdd/set-token":
             token = body.get("token", "").strip().replace("Bearer ", "")
-            if not token:
-                # Try discovery from known production tokens or Playwright
-                from notifyseat.providers.tcdd import TCDDProvider
-                provider = TCDDProvider()
-                token = provider.JWT_TOKENS[0] if provider.JWT_TOKENS else ""
-
-            cfg = self.config_mgr.get()
             if token:
+                cfg = self.config_mgr.get()
                 cfg.tcdd_token = token
                 self.config_mgr.save(cfg)
                 self._send_json({"success": True, "connected": True, "token": token[:30] + "..."})
             else:
-                self._send_json({"success": False, "connected": False, "error": "Could not auto-connect TCDD"})
-            return
-
-        if path == "/api/tcdd/set-token":
-            token = body.get("token", "").strip().replace("Bearer ", "")
-            cfg = self.config_mgr.get()
-            cfg.tcdd_token = token
-            self.config_mgr.save(cfg)
-            self._send_json({"success": True, "connected": bool(token)})
+                cfg = self.config_mgr.get()
+                if cfg.tcdd_token:
+                    self._send_json({"success": True, "connected": True, "token": cfg.tcdd_token[:30] + "..."})
+                else:
+                    self._send_json({"success": False, "connected": False, "error": "Please provide a valid session token"})
             return
 
         if path == "/api/test-notify":

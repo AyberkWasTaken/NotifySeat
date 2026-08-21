@@ -394,15 +394,21 @@ async function handleConnectTCDD() {
   const btnHeader = document.getElementById('btnConnectTcddHeader');
   const btnModal = document.getElementById('btnAutoConnectTcdd');
   const statusText = document.getElementById('tcddStatusText');
+  const tokenInput = document.getElementById('cfgTcddToken');
+
+  let token = tokenInput ? tokenInput.value.trim() : '';
+
+  if (!token) {
+    token = prompt("Please paste your active TCDD Bearer token (from ebilet F12 Network tab -> Authorization header):", "");
+    if (!token) return;
+    if (tokenInput) tokenInput.value = token;
+  }
 
   if (btnHeader) btnHeader.innerText = '⏳ Connecting...';
   if (btnModal) btnModal.innerText = '⏳ Connecting...';
   if (statusText) statusText.innerText = 'Status: Authenticating session...';
 
   try {
-    const tokenInput = document.getElementById('cfgTcddToken');
-    const token = tokenInput ? tokenInput.value : '';
-
     const res = await fetch('/api/tcdd/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -423,19 +429,19 @@ async function handleConnectTCDD() {
         statusText.innerText = 'Status: Connected (Active Session)';
         statusText.style.color = 'var(--accent-green)';
       }
-      if (tokenInput && data.token) {
-        tokenInput.value = data.token;
-      }
       appendLog('⚡ TCDD session connected successfully. Live real-time checking active.', 'log-alert');
+      
+      // Auto trigger check for visible tasks
+      loadTasks();
     } else {
       if (btnHeader) btnHeader.innerText = '⚡ Connect TCDD';
-      if (btnModal) btnModal.innerText = '⚡ 1-Click Connect TCDD';
+      if (btnModal) btnModal.innerText = '⚡ Connect TCDD';
       if (statusText) statusText.innerText = 'Status: Connection Failed';
-      alert('Could not auto-connect TCDD. Please paste token or try again.');
+      alert('Could not authenticate TCDD token: ' + (data.error || 'Unknown error'));
     }
   } catch (err) {
     if (btnHeader) btnHeader.innerText = '⚡ Connect TCDD';
-    if (btnModal) btnModal.innerText = '⚡ 1-Click Connect TCDD';
+    if (btnModal) btnModal.innerText = '⚡ Connect TCDD';
     if (statusText) statusText.innerText = 'Status: Error';
   }
 }
