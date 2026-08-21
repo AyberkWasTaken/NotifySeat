@@ -1,6 +1,7 @@
 /**
  * NotifySeat Web Application
  * Local Transport Seat & Cancellation Radar
+ * Crafted for Ayberk
  */
 
 let currentTransport = 'tcdd';
@@ -22,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Polling fallback
   setInterval(loadStats, 3000);
-  setInterval(loadTasks, 5000);
+  setInterval(loadTasks, 4000);
 });
 
 // --- Sound Synthesizer (Web Audio API) ---
@@ -41,7 +42,7 @@ function playChimeSound() {
     osc2.frequency.setValueAtTime(880.00, ctx.currentTime);
     osc2.frequency.exponentialRampToValueAtTime(1174.66, ctx.currentTime + 0.3); // D6
 
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
 
     osc1.connect(gain);
@@ -53,7 +54,7 @@ function playChimeSound() {
     osc1.stop(ctx.currentTime + 0.8);
     osc2.stop(ctx.currentTime + 0.8);
   } catch (e) {
-    console.log('Audio not allowed yet by user interaction.');
+    console.log('Audio requires prior user interaction in this browser.');
   }
 }
 
@@ -68,26 +69,26 @@ function initEventStream() {
       } catch (err) {}
     };
     eventSource.onerror = () => {
-      // Reconnect silently handled by browser
+      // Browser handles reconnect
     };
   }
 }
 
 function handleStreamEvent(event) {
   const { type, data } = event;
-  const timeStr = new Date().toLocaleTimeString();
 
   if (type === 'seats_found') {
     playChimeSound();
-    appendLog(`🚨 [SEAT FOUND] ${data.name}: ${data.seats} seat(s) available!`, 'log-alert');
+    const msg = data.message || `🚨 ${data.seats} seat(s) found on ${data.name}!`;
+    appendLog(msg, 'log-alert');
     loadStats();
     loadTasks();
   } else if (type === 'task_checked') {
     const seats = data.seats || 0;
     if (seats > 0) {
-      appendLog(`✔ Checked ${data.name}: ${seats} seat(s) ready.`);
+      appendLog(data.message || `✔ Checked ${data.name}: ${seats} seat(s) available.`);
     } else {
-      appendLog(`🔍 Checked ${data.name}: Sold Out (0 seats). Monitoring...`);
+      appendLog(data.message || `🔍 Checked ${data.name}: 0 seats available. Monitoring...`);
     }
   } else if (type === 'engine_started') {
     updateEngineState(true);
@@ -173,13 +174,54 @@ function renderTasks(tasks) {
     const cardClass = hasSeats ? 'task-card has-seats' : 'task-card';
     const transportClass = t.transport_type === 'flight' ? 'flight' : (t.transport_type === 'bus' ? 'bus' : '');
     
-    let seatDisplay = `<span style="color: var(--text-muted);">No seats currently (0)</span>`;
-    if (hasSeats) {
-      seatDisplay = `<span class="seat-number-badge">${t.last_found_seats} Seat(s) Available! 🎉</span>`;
+    // Parse detailed services
+    let servicesList = [];
+    let bookingUrl = 'https://ebilet.tcddtasimacilik.gov.tr';
+    if (t.last_service_info) {
+      if (Array.isArray(t.last_service_info.services)) {
+        servicesList = t.last_service_info.services;
+      } else if (t.last_service_info.service_name) {
+        servicesList = [t.last_service_info];
+      }
+      if (t.last_service_info.booking_url) {
+        bookingUrl = t.last_service_info.booking_url;
+      }
     }
 
-    const bookingBtn = t.last_service_info && t.last_service_info.booking_url ? `
-      <a href="${t.last_service_info.booking_url}" target="_blank" class="btn btn-sm btn-success">
+    let seatDisplay = '';
+    if (hasSeats && servicesList.length > 0) {
+      seatDisplay = `
+        <div style="margin-bottom: 0.5rem;">
+          <span class="seat-number-badge">${t.last_found_seats} Seat(s) Available! 🎉</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+          ${servicesList.map(s => {
+            const classText = s.class_breakdown ? Object.entries(s.class_breakdown)
+              .filter(([_, count]) => count > 0)
+              .map(([cls, count]) => `${count} ${cls}`).join(', ') : '';
+            return `
+              <div style="font-size: 0.85rem; background: rgba(0,0,0,0.25); padding: 0.4rem 0.6rem; border-radius: 6px; border-left: 3px solid var(--accent-green);">
+                <b>⏰ ${s.departure_time}</b> - ${s.service_name}: <b>${s.total_available_seats} seat(s)</b>
+                ${classText ? `<div style="font-size: 0.75rem; color: #a7f3d0;">(${classText})</div>` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } else if (hasSeats) {
+      seatDisplay = `<span class="seat-number-badge">${t.last_found_seats} Seat(s) Available! 🎉</span>`;
+    } else {
+      const lastCheckTime = t.last_checked_at ? new Date(t.last_checked_at).toLocaleTimeString() : 'Pending first check';
+      seatDisplay = `
+        <div style="font-size: 0.85rem; color: var(--text-muted);">
+          All trains/trips sold out (0 seats).
+          <div style="font-size: 0.75rem; margin-top: 0.2rem;">Last checked at ${lastCheckTime}. Watching for passenger cancellations...</div>
+        </div>
+      `;
+    }
+
+    const bookingBtn = hasSeats ? `
+      <a href="${bookingUrl}" target="_blank" class="btn btn-sm btn-success">
         Book Now ➔
       </a>
     ` : '';
@@ -205,9 +247,9 @@ function renderTasks(tasks) {
         </div>
         <div class="card-actions">
           <div style="display: flex; gap: 0.4rem;">
-            <button class="btn btn-sm btn-secondary" onclick="checkTaskNow('${t.id}')" title="Check Now">⚡ Check</button>
+            <button class="btn btn-sm btn-secondary" onclick="checkTaskNow('${t.id}')" title="Check Now">⚡ Check Now</button>
             <button class="btn btn-sm btn-secondary" onclick="toggleTaskPause('${t.id}', '${t.status}')">
-              ${t.status === 'active' ? '⏸' : '▶'}
+              ${t.status === 'active' ? '⏸ Pause' : '▶ Resume'}
             </button>
             <button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')" title="Delete">🗑</button>
           </div>
@@ -219,8 +261,9 @@ function renderTasks(tasks) {
 }
 
 async function checkTaskNow(taskId) {
-  appendLog(`⚡ Manual check triggered for task ${taskId}...`);
-  await fetch(`/api/tasks/${taskId}/check`, { method: 'POST' });
+  appendLog(`⚡ Triggering immediate live check for task [${taskId}]...`);
+  const res = await fetch(`/api/tasks/${taskId}/check`, { method: 'POST' });
+  const data = await res.json();
   loadTasks();
   loadStats();
 }
@@ -232,7 +275,7 @@ async function toggleTaskPause(taskId, currentStatus) {
 }
 
 async function deleteTask(taskId) {
-  if (confirm('Are you sure you want to stop tracking this route?')) {
+  if (confirm('Are you sure you want to delete this route tracker?')) {
     await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
     loadTasks();
     loadStats();
@@ -241,19 +284,22 @@ async function deleteTask(taskId) {
 
 async function triggerInstantDemo() {
   appendLog(`🧪 Starting instant live seat cancellation demo...`, 'log-alert');
-  const res = await fetch('/api/tasks', {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 2);
+  
+  await fetch('/api/tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       transport_type: 'simulation',
       origin: 'İstanbul(Söğütlüçeşme)',
-      destination: 'Ankara Gar',
-      date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-      check_interval_seconds: 4,
+      destination: 'Eskişehir',
+      date: tomorrow.toISOString().split('T')[0],
+      check_interval_seconds: 5,
       notification_channels: ['desktop']
     })
   });
-  const newTask = await res.json();
+  
   // Ensure engine is running
   if (!isEngineRunning) {
     await toggleEngine();
@@ -335,7 +381,8 @@ async function handleCreateTask(e) {
   closeModal('modalNewTask');
   loadTasks();
   loadStats();
-  // If engine is not running, start it
+  
+  // If engine is not running, auto-start it
   if (!isEngineRunning) {
     toggleEngine();
   }

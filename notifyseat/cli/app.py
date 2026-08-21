@@ -94,7 +94,7 @@ def cmd_track(db: Database, args: argparse.Namespace):
         task = interactive_create_task()
         if task:
             db.create_task(task)
-            print(f"✔ Task [{task.id}] saved to database! Run 'notifyseat run' to start checking.")
+            print(f"✔ Task [{task.id}] saved to database! Run 'notifyseat run' or launch 'notifyseat gui' to monitor.")
     else:
         channels = args.channels.split(",") if args.channels else ["desktop"]
         task = TrackingTask(
@@ -111,6 +111,31 @@ def cmd_track(db: Database, args: argparse.Namespace):
         print(f"✔ Created tracking task [{task.id}]: {task.name}")
 
 
+def cmd_check_now(db: Database, config_mgr: ConfigManager, task_id: str):
+    task = db.get_task(task_id)
+    if not task:
+        print(f"✖ Task [{task_id}] not found in database.")
+        return
+
+    print(f"⚡ Checking route [{task.name}] on {task.date}...")
+    cfg = config_mgr.get()
+    notifier_mgr = NotificationManager(cfg, db)
+    scheduler = EngineScheduler(db, cfg, notifier_mgr)
+    result = scheduler.worker.execute_task(task)
+
+    if result.found:
+        print(f"\n\033[1;32m{result.message}\033[0m\n")
+        if result.services:
+            for s in result.services:
+                class_desc = ", ".join([f"{count} {cls}" for cls, count in s.class_breakdown.items() if count > 0])
+                print(f"  • {s.departure_time} - {s.service_name}: {s.total_available_seats} seats ({class_desc})")
+                if s.booking_url:
+                    print(f"    Booking link: {s.booking_url}")
+            print()
+    else:
+        print(f"\n\033[1;33m{result.message}\033[0m\n")
+
+
 def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
     print_banner()
     cfg = config_mgr.get()
@@ -124,7 +149,7 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
             name="Demo TCDD YHT Express",
             transport_type=TransportType.SIMULATION,
             origin="İstanbul(Söğütlüçeşme)",
-            destination="Ankara Gar",
+            destination="Eskişehir",
             date=(datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
             check_interval_seconds=8,
             notification_channels=["desktop"]
@@ -138,23 +163,20 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
     def on_event(event_type: str, data: dict):
         ts = datetime.now().strftime("%H:%M:%S")
         if event_type == "seats_found":
+            msg = data.get("message") or f"Found {data.get('seats')} seats on {data.get('name')}!"
             if HAS_RICH:
                 console.print(Panel(
-                    f"[bold green]🚨 SEATS DETECTED![/bold green]\n"
-                    f"Route: [bold white]{data.get('name')}[/bold white]\n"
-                    f"Available Seats: [bold yellow]{data.get('seats')}[/bold yellow]\n"
-                    f"Notification dispatched via configured channels!",
+                    f"[bold green]🚨 SEATS DETECTED![/bold green]\n\n"
+                    f"{msg}\n\n"
+                    f"[dim]Notification dispatched via configured channels.[/dim]",
                     title="🎉 CANCELLATION OPENING FOUND",
                     border_style="green"
                 ))
             else:
-                print(f"[{ts}] 🚨 SEATS DETECTED! {data.get('name')} -> {data.get('seats')} seats available!")
+                print(f"\n\a[{ts}] 🚨 SEATS DETECTED! {msg}\n")
         elif event_type == "task_checked":
-            seats = data.get("seats", 0)
-            if seats == 0:
-                print(f"[{ts}] 🔍 Checked {data.get('name')}: Full (0 seats). Monitoring...")
-            else:
-                print(f"[{ts}] ✔ Checked {data.get('name')}: {seats} seats available.")
+            msg = data.get("message") or f"Checked {data.get('name')}: {data.get('seats', 0)} seats."
+            print(f"[{ts}] {msg}")
 
     scheduler.subscribe_events(on_event)
     scheduler.start()
@@ -175,10 +197,10 @@ def cmd_demo(db: Database, config_mgr: ConfigManager):
     print("This will simulate a sold-out train where a passenger cancels their ticket live!\n")
 
     demo_task = TrackingTask(
-        name="Istanbul ➔ Ankara YHT (Live Demo)",
+        name="İstanbul(Söğütlüçeşme) ➔ Eskişehir YHT (Live Demo)",
         transport_type=TransportType.SIMULATION,
         origin="İstanbul(Söğütlüçeşme)",
-        destination="Ankara Gar",
+        destination="Eskişehir",
         date=(datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"),
         check_interval_seconds=4,
         notification_channels=["desktop"]
@@ -193,9 +215,8 @@ def cmd_demo(db: Database, config_mgr: ConfigManager):
         ts = datetime.now().strftime("%H:%M:%S")
         if event_type == "seats_found":
             print(f"\n\a\033[1;32m[{ts}] 🎉 BREAKING: PASSENGER CANCELLATION DETECTED!\033[0m")
-            print(f"  • Route: {data.get('name')}")
-            print(f"  • Opened Seats: {data.get('seats')} (Pulman & Business)")
-            print(f"  • Status: Alert dispatched to Desktop / Sound / Telegram!\n")
+            print(f"  • {data.get('message')}")
+            print(f"  • Status: Alert dispatched to Desktop / Audio Chime / Telegram!\n")
         elif event_type == "task_checked":
             print(f"[{ts}] 🔍 Checking route... Status: Train is currently SOLD OUT (0 seats). Waiting...")
 
@@ -236,9 +257,13 @@ def main():
     track_p.add_argument("--from", dest="origin", help="Departure station/airport/city")
     track_p.add_argument("--to", dest="destination", help="Arrival station/airport/city")
     track_p.add_argument("--date", help="Travel date (YYYY-MM-DD)")
-    track_p.add_argument("--time", help="Time filter (e.g. morning, 08:30, 08:00-14:00)")
+    track_p.add_argument("--time", help="Time filter (e.g. morning, 16:35, 08:00-14:00)")
     track_p.add_argument("--interval", type=int, default=30, help="Check frequency in seconds")
     track_p.add_argument("--channels", default="desktop", help="Comma-separated channels: desktop,telegram,discord,email,sms,webhook")
+
+    # check
+    chk_p = subparsers.add_parser("check", help="Trigger an immediate live check for a task")
+    chk_p.add_argument("task_id", help="Task ID to check immediately")
 
     # run
     subparsers.add_parser("run", help="Start monitoring engine in foreground")
@@ -277,6 +302,7 @@ def main():
         print("\nCommands available:")
         print("  notifyseat track         ➔ Add a new route to monitor")
         print("  notifyseat run           ➔ Start the background monitoring engine")
+        print("  notifyseat check <id>    ➔ Trigger immediate check for a task")
         print("  notifyseat demo          ➔ Run an instant live cancellation demo")
         print("  notifyseat gui           ➔ Launch the local Web GUI dashboard")
         print("  notifyseat list          ➔ View all configured tasks")
@@ -288,6 +314,8 @@ def main():
         cmd_list(db)
     elif args.command == "track":
         cmd_track(db, args)
+    elif args.command == "check":
+        cmd_check_now(db, config_mgr, args.task_id)
     elif args.command in ("run", "start"):
         cmd_run(db, config_mgr, args)
     elif args.command == "demo":

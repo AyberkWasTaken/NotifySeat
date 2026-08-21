@@ -1,6 +1,6 @@
 """Task Worker: runs availability check for a single task and processes state changes."""
 from datetime import datetime
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 from notifyseat.core.models import TrackingTask, CheckResult, TaskStatus
 from notifyseat.core.database import Database
 from notifyseat.core.logger import logger
@@ -32,6 +32,14 @@ class TaskWorker:
         result: CheckResult = provider.check_route(task)
         now_str = datetime.now().isoformat()
 
+        # Build services payload
+        services_dict_list = [s.to_dict() for s in result.services]
+        last_service_data = {
+            "services": services_dict_list,
+            "summary": result.message,
+            "booking_url": result.services[0].booking_url if result.services else "https://ebilet.tcddtasimacilik.gov.tr"
+        } if result.services else None
+
         # Log check to database
         self.db.log_check(
             task_id=task.id,
@@ -44,29 +52,21 @@ class TaskWorker:
 
         prev_seats = task.last_found_seats
         new_seats = result.seats_count
-        first_service = result.services[0].to_dict() if result.services else None
 
-        # State transition: 0 -> >0 or significant change
+        # State transition: 0 -> >0 or significant seat change
         if result.found and (prev_seats == 0 or new_seats != prev_seats):
-            logger.info(f"🚨 [SEATS AVAILABLE] Task '{task.name}': {new_seats} seat(s) detected!")
-
-            # Format detailed message
-            service_desc = ""
-            if result.services:
-                s = result.services[0]
-                service_desc = f"{s.service_name} at {s.departure_time}"
-                if s.class_breakdown:
-                    breakdown_str = ", ".join([f"{k}: {v}" for k, v in s.class_breakdown.items() if v > 0])
-                    service_desc += f" ({breakdown_str})"
+            logger.info(f"🚨 [SEATS AVAILABLE] Task '{task.name}': {new_seats} seat(s) detected! -> {result.message}")
 
             title = f"Seat Available: {task.origin} ➔ {task.destination}"
-            body = f"🎉 Great news! {new_seats} seat(s) found on {service_desc} on {task.date}."
+            body = result.message
             
+            first_service = result.services[0] if result.services else None
             notification_data = {
                 "seats_count": new_seats,
-                "service_name": result.services[0].service_name if result.services else "Direct Service",
-                "departure_time": result.services[0].departure_time if result.services else "",
-                "booking_url": result.services[0].booking_url if result.services else "https://ebilet.tcddtasimacilik.gov.tr"
+                "service_name": first_service.service_name if first_service else "Direct Service",
+                "departure_time": first_service.departure_time if first_service else "",
+                "booking_url": first_service.booking_url if first_service else "https://ebilet.tcddtasimacilik.gov.tr",
+                "services": services_dict_list
             }
 
             # Dispatch alerts
@@ -83,7 +83,7 @@ class TaskWorker:
                 task_id=task.id,
                 last_checked=now_str,
                 found_seats=new_seats,
-                service_info=first_service,
+                service_info=last_service_data,
                 status=new_status
             )
 
@@ -91,7 +91,9 @@ class TaskWorker:
                 "task_id": task.id,
                 "name": task.name,
                 "seats": new_seats,
-                "service": first_service
+                "message": result.message,
+                "services": services_dict_list,
+                "service_info": last_service_data
             })
 
         else:
@@ -100,14 +102,16 @@ class TaskWorker:
                 task_id=task.id,
                 last_checked=now_str,
                 found_seats=new_seats,
-                service_info=first_service
+                service_info=last_service_data
             )
 
             self._emit_event("task_checked", {
                 "task_id": task.id,
                 "name": task.name,
                 "seats": new_seats,
-                "found": result.found
+                "found": result.found,
+                "message": result.message,
+                "services": services_dict_list
             })
 
         return result
