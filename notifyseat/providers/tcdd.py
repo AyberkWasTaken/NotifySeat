@@ -214,23 +214,26 @@ class TCDDProvider(BaseProvider):
         """Automates headless browser session to check exact trip availability."""
         return None
 
-    def _parse_tcdd_response(self, task: TrackingTask, data: Dict[str, Any], origin_name: str, dest_name: str) -> CheckResult:
-        """Parses TCDD JSON response and extracts all train trips, times, and seat breakdowns."""
+    def _parse_ytp_response(self, task: TrackingTask, data: Any, origin_name: str, dest_name: str) -> CheckResult:
+        """Parses TCDD JSON response (list or dictionary) and extracts all train trips, times, and seat breakdowns."""
         services: List[ServiceInfo] = []
         total_seats = 0
 
-        sefer_list = (
-            data.get("seferListesi", []) or 
-            data.get("cevapBilgileri", {}).get("seferListesi", []) or
-            data.get("seferSorgulamaSonucList", [])
-        )
+        if isinstance(data, list):
+            sefer_list = data
+        else:
+            sefer_list = (
+                data.get("seferListesi", []) or 
+                data.get("cevapBilgileri", {}).get("seferListesi", []) or
+                data.get("seferSorgulamaSonucList", [])
+            )
 
         checked_trains_summary = []
 
         for sefer in sefer_list:
-            train_name = sefer.get("trenAdi") or sefer.get("seferAdi") or f"YHT {sefer.get('trenNo', '')}"
-            dep_time = sefer.get("binisSaati") or sefer.get("kalkisSaati", "")
-            arr_time = sefer.get("inisSaati") or sefer.get("varisSaati", "")
+            train_name = sefer.get("trainName") or sefer.get("trenAdi") or sefer.get("seferAdi") or f"YHT {sefer.get('trainId', sefer.get('trenNo', ''))}"
+            dep_time = sefer.get("departureTime") or sefer.get("binisSaati") or sefer.get("kalkisSaati", "")
+            arr_time = sefer.get("arrivalTime") or sefer.get("inisSaati") or sefer.get("varisSaati", "")
 
             # Filter by time if requested
             if task.time_filter and not self._match_time_filter(dep_time, task.time_filter):
@@ -238,6 +241,8 @@ class TCDDProvider(BaseProvider):
 
             # Parse wagons and seat availability
             vagon_tipleri = (
+                sefer.get("wagons", []) or 
+                sefer.get("cabinClasses", []) or
                 sefer.get("vagonTipleriBosYerUcret", []) or 
                 sefer.get("vagonListesi", []) or
                 sefer.get("vagonTipiBosYerList", [])
@@ -246,8 +251,8 @@ class TCDDProvider(BaseProvider):
             train_seats = 0
 
             for vagon in vagon_tipleri:
-                tip = vagon.get("vagonTipAdi") or vagon.get("vagonTipi", "Pulman")
-                bos_yer = int(vagon.get("bosYer", 0) or vagon.get("kalanKoltukSayisi", 0))
+                tip = vagon.get("name") or vagon.get("cabinClassName") or vagon.get("vagonTipAdi") or vagon.get("vagonTipi", "Pulman")
+                bos_yer = int(vagon.get("availableSeats", 0) or vagon.get("seatCount", 0) or vagon.get("bosYer", 0) or vagon.get("kalanKoltukSayisi", 0))
                 
                 # Check class filter
                 if task.seat_class and task.seat_class != "ANY":
