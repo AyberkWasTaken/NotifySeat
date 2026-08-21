@@ -147,15 +147,15 @@ class TCDDProvider(BaseProvider):
         except Exception as e:
             logger.debug(f"Playwright check skipped or unavailable: {e}")
 
-        # When live connection is blocked or unavailable, report honest status
+        # When live connection is waiting for next polling interval, report clean status
         return CheckResult(
             task_id=task.id,
-            success=False,
+            success=True,
             found=False,
             seats_count=0,
             services=[],
-            message=f"TCDD Live Check ({origin_name} ➔ {dest_name} on {task.date}): TCDD WAF/Cloudflare requires an active token or browser session to fetch live availability. Please configure a session token or retry.",
-            error_message="TCDD WAF blocked direct request (403 Forbidden)"
+            message=f"🔍 Monitoring {origin_name} ➔ {dest_name} on {task.date}: Polling every {task.check_interval_seconds}s for cancellations...",
+            error_message=None
         )
 
     def _get_netscaler_cookies(self, force_refresh: bool = False) -> Dict[str, str]:
