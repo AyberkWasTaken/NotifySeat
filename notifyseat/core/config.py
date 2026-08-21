@@ -71,6 +71,7 @@ class AppConfig:
     user_name: str = "Ayberk"
     web_host: str = "127.0.0.1"
     web_port: int = 8080
+    tcdd_token: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -83,7 +84,8 @@ class AppConfig:
             "default_check_interval": self.default_check_interval,
             "user_name": self.user_name,
             "web_host": self.web_host,
-            "web_port": self.web_port
+            "web_port": self.web_port,
+            "tcdd_token": self.tcdd_token
         }
 
     @classmethod
@@ -109,6 +111,8 @@ class AppConfig:
             cfg.web_host = str(data["web_host"])
         if "web_port" in data:
             cfg.web_port = int(data["web_port"])
+        if "tcdd_token" in data:
+            cfg.tcdd_token = str(data["tcdd_token"])
         return cfg
 
 

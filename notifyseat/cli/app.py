@@ -291,6 +291,10 @@ def main():
     r_p = subparsers.add_parser("resume", help="Resume a tracking task")
     r_p.add_argument("task_id", help="Task ID")
 
+    # set-token
+    tok_p = subparsers.add_parser("set-token", help="Set TCDD Web/Mobile session Bearer token")
+    tok_p.add_argument("token", help="Bearer token copied from TCDD web app / devtools")
+
     args = parser.parse_args()
 
     db = Database()
@@ -303,6 +307,7 @@ def main():
         print("  notifyseat track         ➔ Add a new route to monitor")
         print("  notifyseat run           ➔ Start the background monitoring engine")
         print("  notifyseat check <id>    ➔ Trigger immediate check for a task")
+        print("  notifyseat set-token <tok> ➔ Set active TCDD session bearer token")
         print("  notifyseat demo          ➔ Run an instant live cancellation demo")
         print("  notifyseat gui           ➔ Launch the local Web GUI dashboard")
         print("  notifyseat list          ➔ View all configured tasks")
@@ -318,6 +323,11 @@ def main():
         cmd_check_now(db, config_mgr, args.task_id)
     elif args.command in ("run", "start"):
         cmd_run(db, config_mgr, args)
+    elif args.command == "set-token":
+        cfg = config_mgr.get()
+        cfg.tcdd_token = args.token.strip().replace("Bearer ", "")
+        config_mgr.save(cfg)
+        print(f"✔ TCDD Bearer token saved successfully!")
     elif args.command == "demo":
         cmd_demo(db, config_mgr)
     elif args.command == "test-notify":
