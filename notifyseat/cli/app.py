@@ -80,7 +80,7 @@ def cmd_list(db: Database):
                 last_checked
             )
         console.print(table)
-        console.print("[dim]Commands: 'python3 main.py check <id>' | 'python3 main.py delete <id>' | 'python3 main.py pause <id>'[/dim]\n")
+        console.print("[dim]Commands: 'notifyseat check <id>' | 'notifyseat delete <id>' | 'notifyseat pause <id>'[/dim]\n")
     else:
         print("\n--- Monitored Routes ---")
         for t in tasks:
