@@ -102,7 +102,7 @@ def cmd_track(db: Database, args: argparse.Namespace):
             destination=args.destination,
             date=args.date or (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y"),
             time_filter=args.time,
-            check_interval_seconds=args.interval or 60,
+            check_interval_seconds=args.interval or 300,
             notification_channels=channels,
             status=TaskStatus.ACTIVE
         )
