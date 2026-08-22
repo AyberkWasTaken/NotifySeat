@@ -266,7 +266,7 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
             def on_req(req):
                 url = req.url.lower()
                 auth = req.headers.get("authorization", "")
-                if ("train" in url or "sefer" in url or "availability" in url or "tms" in url or "station" in url) and not (url.endswith(".js") or url.endswith(".css")):
+                if ("train-availability" in url or "load-trains" in url or "sefer" in url or "availability" in url) and not ("station" in url or url.endswith(".json") or url.endswith(".js") or url.endswith(".css")):
                     token = auth.replace("Bearer", "").strip() if "Bearer" in auth else ""
                     headers_dict = dict(req.headers)
                     cookies_list = context.cookies()
@@ -290,10 +290,16 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
 
                     if not captured:
                         captured.append(req.url)
-                        print(f"\n🎉 Successfully captured live TCDD session from: {req.url}")
+                        print(f"\n🎉 Successfully captured live TCDD search session from: {req.url}")
+                        if token:
+                            print(f"🔑 Live Token: {token[:25]}... (Length {len(token)})")
 
             page.on("request", on_req)
-            page.goto("https://ebilet.tcddtasimacilik.gov.tr")
+
+            try:
+                page.goto("https://ebilet.tcddtasimacilik.gov.tr", wait_until="commit", timeout=60000)
+            except Exception as e:
+                logger.debug(f"Navigation warning: {e}")
 
             for _ in range(180):
                 if captured:
@@ -310,7 +316,7 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
             if captured:
                 print("✔ Active TCDD session connected and saved to config!")
             else:
-                print("⚠️ No session was intercepted. You can also paste your token with 'python3 main.py set-token <token>'.")
+                print("⚠️ No search session was intercepted. You can also paste your token with 'python3 main.py set-token <token>'.")
     except Exception as e:
         print(f"Browser connection error: {e}")
 
