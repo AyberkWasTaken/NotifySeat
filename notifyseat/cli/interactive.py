@@ -78,6 +78,20 @@ def prompt_text(prompt: str, default: str = "") -> str:
         raise KeyboardInterrupt
 
 
+def prompt_station(prompt: str) -> str:
+    C_CYAN = "\001\033[1;36m\002"
+    C_RESET = "\001\033[0m\002"
+    while True:
+        try:
+            val = input(f"{C_CYAN}? {prompt}:{C_RESET} ").strip()
+            if val:
+                return val
+        except EOFError:
+            return ""
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+
+
 def interactive_create_task() -> Optional[TrackingTask]:
     """Guides the user through creating a new TCDD route tracking task."""
     print("\n" + "=" * 55)
@@ -93,8 +107,8 @@ def interactive_create_task() -> Optional[TrackingTask]:
 
     provider = registry.get(TransportType.TCDD)
 
-    raw_origin = prompt_text("Enter Departure Station", default="İstanbul(Söğütlüçeşme)")
-    raw_dest = prompt_text("Enter Arrival Station", default="Ankara Gar")
+    raw_origin = prompt_station("Enter Departure Station")
+    raw_dest = prompt_station("Enter Arrival Station")
 
     # Intelligent fuzzy matching (e.g. 'ankaragar' -> 'Ankara Gar', 'sogutlucesme' -> 'İstanbul(Söğütlüçeşme)', 'basmane' -> 'İzmir (Basmane)')
     res_orig = provider.get_station_by_name(raw_origin)
