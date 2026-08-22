@@ -35,6 +35,13 @@ class DiscordConfig:
 
 
 @dataclass
+class WhatsAppConfig:
+    enabled: bool = False
+    phone_number: str = ""
+    apikey: str = ""
+
+
+@dataclass
 class DesktopConfig:
     enabled: bool = True
     sound_enabled: bool = True
@@ -62,12 +69,13 @@ class WebhookConfig:
 @dataclass
 class AppConfig:
     email: EmailConfig = field(default_factory=EmailConfig)
+    whatsapp: WhatsAppConfig = field(default_factory=WhatsAppConfig)
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     discord: DiscordConfig = field(default_factory=DiscordConfig)
     desktop: DesktopConfig = field(default_factory=DesktopConfig)
     sms: SMSConfig = field(default_factory=SMSConfig)
     webhook: WebhookConfig = field(default_factory=WebhookConfig)
-    default_check_interval: int = 30
+    default_check_interval: int = 60
     user_name: str = "Ayberk"
     web_host: str = "127.0.0.1"
     web_port: int = 8080
@@ -76,6 +84,7 @@ class AppConfig:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "email": asdict(self.email),
+            "whatsapp": asdict(self.whatsapp),
             "telegram": asdict(self.telegram),
             "discord": asdict(self.discord),
             "desktop": asdict(self.desktop),
@@ -93,6 +102,8 @@ class AppConfig:
         cfg = cls()
         if "email" in data:
             cfg.email = EmailConfig(**data["email"])
+        if "whatsapp" in data:
+            cfg.whatsapp = WhatsAppConfig(**data["whatsapp"])
         if "telegram" in data:
             cfg.telegram = TelegramConfig(**data["telegram"])
         if "discord" in data:

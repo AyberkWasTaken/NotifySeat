@@ -7,9 +7,10 @@ from notifyseat.core.database import Database
 from notifyseat.core.logger import logger
 from notifyseat.notifiers.base import BaseNotifier
 from notifyseat.notifiers.desktop import DesktopNotifier
+from notifyseat.notifiers.email import EmailNotifier
+from notifyseat.notifiers.whatsapp import WhatsAppNotifier
 from notifyseat.notifiers.telegram import TelegramNotifier
 from notifyseat.notifiers.discord import DiscordNotifier
-from notifyseat.notifiers.email import EmailNotifier
 from notifyseat.notifiers.sms import SMSNotifier
 from notifyseat.notifiers.webhook import WebhookNotifier
 
@@ -30,9 +31,10 @@ class NotificationManager:
             self.config = config
         self.notifiers = {
             "desktop": DesktopNotifier(self.config.desktop),
+            "email": EmailNotifier(self.config.email),
+            "whatsapp": WhatsAppNotifier(self.config.whatsapp),
             "telegram": TelegramNotifier(self.config.telegram),
             "discord": DiscordNotifier(self.config.discord),
-            "email": EmailNotifier(self.config.email),
             "sms": SMSNotifier(self.config.sms),
             "webhook": WebhookNotifier(self.config.webhook)
         }
@@ -60,8 +62,15 @@ class NotificationManager:
                 return results
             self._last_notified[task.id] = now
 
-        # Determine which channels to send to
-        target_channels = task.notification_channels if (task and task.notification_channels) else ["desktop"]
+        # Determine which channels to send to:
+        # Include task-specific channels PLUS any globally enabled channels (Email, WhatsApp, Desktop)
+        target_channels = set(task.notification_channels if (task and task.notification_channels) else ["desktop"])
+        if self.config.desktop.enabled:
+            target_channels.add("desktop")
+        if self.config.email.enabled and self.config.email.recipient_email:
+            target_channels.add("email")
+        if self.config.whatsapp.enabled and self.config.whatsapp.phone_number:
+            target_channels.add("whatsapp")
         
         for ch_name in target_channels:
             notifier = self.notifiers.get(ch_name.lower())
@@ -101,3 +110,14 @@ class NotificationManager:
         if not notifier:
             return False
         return notifier.test()
+
+    def test_all(self) -> Dict[str, bool]:
+        """Test all active/configured channels."""
+        results = {}
+        if self.config.desktop.enabled and "desktop" in self.notifiers:
+            results["desktop"] = self.notifiers["desktop"].test()
+        if self.config.email.enabled and "email" in self.notifiers:
+            results["email"] = self.notifiers["email"].test()
+        if self.config.whatsapp.enabled and "whatsapp" in self.notifiers:
+            results["whatsapp"] = self.notifiers["whatsapp"].test()
+        return results

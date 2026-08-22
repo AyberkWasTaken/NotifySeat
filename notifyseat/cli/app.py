@@ -10,7 +10,7 @@ from notifyseat.core.config import ConfigManager
 from notifyseat.core.logger import logger
 from notifyseat.notifiers.manager import NotificationManager
 from notifyseat.engine.scheduler import EngineScheduler
-from notifyseat.cli.interactive import interactive_create_task
+from notifyseat.cli.interactive import interactive_create_task, interactive_config
 
 try:
     from rich.console import Console
@@ -258,15 +258,30 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
         print("✔ NotifySeat stopped.")
 
 
-def cmd_test_notify(config_mgr: ConfigManager, channel: str):
+def cmd_config(config_mgr: ConfigManager):
+    interactive_config(config_mgr)
+
+
+def cmd_test_notify(config_mgr: ConfigManager, channel: Optional[str] = None):
     cfg = config_mgr.get()
     mgr = NotificationManager(cfg)
-    print(f"Testing notification channel: '{channel}'...")
-    success = mgr.test_channel(channel)
-    if success:
-        print(f"\033[1;32m✔ Test notification for '{channel}' was SUCCESSFUL!\033[0m")
+    
+    if channel:
+        print(f"Testing notification channel: '{channel}'...")
+        success = mgr.test_channel(channel)
+        if success:
+            print(f"\033[1;32m✔ Test notification for '{channel}' was SUCCESSFUL!\033[0m")
+        else:
+            print(f"\033[1;31m✖ Test notification for '{channel}' failed. Please check configuration settings.\033[0m")
     else:
-        print(f"\033[1;31m✖ Test notification for '{channel}' failed. Please check configuration settings.\033[0m")
+        print("\n\033[1;36mTesting all active notification channels...\033[0m\n")
+        results = mgr.test_all()
+        for ch, ok in results.items():
+            if ok:
+                print(f"  \033[1;32m✔ [{ch.upper()}] Test alert SUCCESSFUL!\033[0m")
+            else:
+                print(f"  \033[1;31m✖ [{ch.upper()}] Test alert FAILED. Check credentials with 'python3 main.py config'.\033[0m")
+        print()
 
 
 def main():
@@ -282,12 +297,12 @@ def main():
     # track
     track_p = subparsers.add_parser("track", help="Add or configure a new route to monitor")
     track_p.add_argument("-i", "--interactive", action="store_true", help="Launch interactive wizard")
-    track_p.add_argument("-t", "--transport", default="tcdd", choices=["tcdd", "flight", "bus", "simulation"], help="Transport type")
+    track_p.add_argument("-t", "--transport", default="tcdd", choices=["tcdd", "flight", "bus"], help="Transport type")
     track_p.add_argument("--from", dest="origin", help="Departure station/airport/city")
     track_p.add_argument("--to", dest="destination", help="Arrival station/airport/city")
     track_p.add_argument("--date", help="Travel date (YYYY-MM-DD)")
     track_p.add_argument("--time", help="Time filter (e.g. morning, afternoon, evening, all)")
-    track_p.add_argument("--channels", default="desktop", help="Comma-separated channels: desktop,telegram,discord,email,sms,webhook")
+    track_p.add_argument("--channels", default="desktop", help="Comma-separated channels: desktop,email,whatsapp")
 
     # check
     chk_p = subparsers.add_parser("check", help="Trigger an immediate live check for a task (or all active tasks)")
@@ -297,14 +312,18 @@ def main():
     subparsers.add_parser("run", help="Start monitoring engine in foreground")
     subparsers.add_parser("start", help="Alias for run")
 
+    # config / notify-setup
+    subparsers.add_parser("config", help="Configure Email and WhatsApp alerts (auto-opens browser)")
+    subparsers.add_parser("notify-setup", help="Alias for config")
+
     # gui
     gui_p = subparsers.add_parser("gui", help="Launch the local Web GUI dashboard")
     gui_p.add_argument("--host", default="127.0.0.1", help="Host address (default 127.0.0.1)")
     gui_p.add_argument("--port", type=int, default=8080, help="Port number (default 8080)")
 
     # test-notify
-    test_p = subparsers.add_parser("test-notify", help="Test a notification channel")
-    test_p.add_argument("channel", choices=["desktop", "telegram", "discord", "email", "sms", "webhook"], help="Channel to test")
+    test_p = subparsers.add_parser("test-notify", help="Test active notification channels")
+    test_p.add_argument("channel", nargs="?", default=None, choices=["desktop", "email", "whatsapp", "telegram", "discord"], help="Optional specific channel to test")
 
     # delete
     del_p = subparsers.add_parser("delete", help="Delete a tracking task")
@@ -329,8 +348,9 @@ def main():
         print("  notifyseat run           ➔ Start the background monitoring engine")
         print("  notifyseat check [id]    ➔ Trigger immediate live check (or check all)")
         print("  notifyseat list          ➔ View all configured routes")
+        print("  notifyseat config        ➔ Setup WhatsApp & Email alerts (auto-opens browser)")
+        print("  notifyseat test-notify   ➔ Test WhatsApp, Email, Desktop alerts")
         print("  notifyseat gui           ➔ Launch the local Web GUI dashboard")
-        print("  notifyseat test-notify   ➔ Test Telegram, Discord, Email, Desktop alert")
         print("  notifyseat delete <id>   ➔ Delete a task")
         print("  notifyseat pause <id>    ➔ Pause monitoring for a task")
         print("  notifyseat resume <id>   ➔ Resume monitoring for a task\n")
@@ -344,6 +364,8 @@ def main():
         cmd_check_now(db, config_mgr, args.task_id)
     elif args.command in ("run", "start"):
         cmd_run(db, config_mgr, args)
+    elif args.command in ("config", "notify-setup"):
+        cmd_config(config_mgr)
     elif args.command == "test-notify":
         cmd_test_notify(config_mgr, args.channel)
     elif args.command == "delete":

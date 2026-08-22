@@ -43,12 +43,11 @@ def interactive_create_task() -> Optional[TrackingTask]:
     transport_choices = [
         "🚅 TCDD Train (YHT High Speed & Mainline)",
         "✈️  Flight (Pegasus Airlines / THY / SunExpress)",
-        "🚌 Intercity Bus (Pamukkale / Kamil Koç / Metro / Obilet)",
-        "🧪 Live Demo / Simulation (Instant Cancellation Test)"
+        "🚌 Intercity Bus (Pamukkale / Kamil Koç / Metro / Obilet)"
     ]
     t_idx = prompt_choice("Select Transport Mode:", transport_choices, default_idx=0)
     
-    t_types = [TransportType.TCDD, TransportType.FLIGHT, TransportType.BUS, TransportType.SIMULATION]
+    t_types = [TransportType.TCDD, TransportType.FLIGHT, TransportType.BUS]
     selected_transport = t_types[t_idx]
     provider = registry.get(selected_transport)
 
@@ -107,9 +106,159 @@ def interactive_create_task() -> Optional[TrackingTask]:
     )
 
     print("\n\033[1;32m✔ Route tracker configured successfully!\033[0m")
-    print(f"  • Name: {task.name}")
     print(f"  • Mode: {task.transport_type.upper()}")
+    print(f"  • Route: {task.origin} ➔ {task.destination}")
     print(f"  • Date: {task.date}")
-    print(f"  • Channels: {', '.join(task.notification_channels)}")
-    print(f"  • Interval: Every {task.check_interval_seconds}s\n")
+    print(f"  • Radar: Checks every 60 seconds\n")
     return task
+
+
+def interactive_config(config_mgr):
+    """Interactive wizard to configure Email and WhatsApp notifications with auto-browser opening."""
+    import webbrowser
+    cfg = config_mgr.get()
+
+    print("\n\033[1;36m==================================================\033[0m")
+    print("\033[1;36m        🔔 NotifySeat Notification Setup          \033[0m")
+    print("\033[1;36m==================================================\033[0m")
+    print("Receive instant seat cancellation alerts on your phone or inbox.\n")
+
+    wa_status = "🟢 ENABLED" if cfg.whatsapp.enabled and cfg.whatsapp.phone_number else "⚪ DISABLED"
+    em_status = "🟢 ENABLED" if cfg.email.enabled and cfg.email.recipient_email else "⚪ DISABLED"
+
+    options = [
+        f"📱 Configure WhatsApp (Direct WhatsApp alerts to your phone) [{wa_status}]",
+        f"📧 Configure Email (Gmail / Outlook / Custom SMTP) [{em_status}]",
+        "⚡ Test All Configured Notification Channels",
+        "🚪 Exit Setup"
+    ]
+
+    choice = prompt_choice("Select an option:", options, default_idx=0)
+
+    if choice == 0:
+        # WhatsApp Setup
+        print("\n\033[1;32m--- 📱 WhatsApp Direct Alert Setup (CallMeBot) ---\033[0m")
+        print("We will open WhatsApp for you with the authorization message pre-filled.")
+        print("1. Click Send on WhatsApp.")
+        print("2. CallMeBot will reply with your API Key (e.g. 123456).")
+        print("3. Paste the API key into the prompt below.\n")
+
+        open_now = prompt_text("Open WhatsApp authorization link now? (Y/n):", default="y").lower().startswith("y")
+        if open_now:
+            try:
+                webbrowser.open("https://wa.me/34911061400?text=I+allow+callmebot+to+send+me+messages")
+                print("🌐 Opened WhatsApp.")
+            except Exception:
+                pass
+
+        phone = prompt_text("Enter your WhatsApp Phone Number (with country code, e.g. +905321234567):", default=cfg.whatsapp.phone_number or "+90")
+        apikey = prompt_text("Enter the API Key sent by CallMeBot (e.g. 123456):", default=cfg.whatsapp.apikey)
+
+        if phone and apikey:
+            cfg.whatsapp.phone_number = phone.strip()
+            cfg.whatsapp.apikey = apikey.strip()
+            cfg.whatsapp.enabled = True
+            config_mgr.save(cfg)
+            print("\n\033[1;32m✔ WhatsApp configuration saved!\033[0m")
+
+            test_now = prompt_text("Send an instant test WhatsApp message to your phone? (Y/n):", default="y").lower().startswith("y")
+            if test_now:
+                from notifyseat.notifiers.whatsapp import WhatsAppNotifier
+                wn = WhatsAppNotifier(cfg.whatsapp)
+                print("⏳ Sending test WhatsApp alert...")
+                if wn.test():
+                    print("\033[1;32m✔ Test WhatsApp message SENT successfully to your phone!\033[0m\n")
+                else:
+                    print("\033[1;31m✖ WhatsApp delivery failed. Please verify your phone number and API key.\033[0m\n")
+
+    elif choice == 1:
+        # Email Setup
+        print("\n\033[1;32m--- 📧 Email (SMTP) Alert Setup ---\033[0m")
+        providers = ["Gmail (smtp.gmail.com)", "Outlook / Hotmail (smtp.office365.com)", "Custom SMTP Server"]
+        p_idx = prompt_choice("Choose Email Provider:", providers, default_idx=0)
+
+        if p_idx == 0:
+            # Gmail
+            print("\n👉 For Gmail, Google requires a 16-character 'App Password'.")
+            print("We will now open your Google Account App Passwords page in your browser.")
+            open_g = prompt_text("Open Google App Passwords page now? (Y/n):", default="y").lower().startswith("y")
+            if open_g:
+                try:
+                    webbrowser.open("https://myaccount.google.com/apppasswords")
+                    print("🌐 Opened Google App Passwords in your browser.")
+                except Exception:
+                    pass
+
+            email_addr = prompt_text("Enter your Gmail address (e.g. user@gmail.com):", default=cfg.email.username or "")
+            app_pass = prompt_text("Enter your 16-character Google App Password:", default=cfg.email.password or "")
+            recipient = prompt_text("Enter recipient email (where alerts will arrive):", default=email_addr)
+
+            if email_addr and app_pass:
+                cfg.email.smtp_host = "smtp.gmail.com"
+                cfg.email.smtp_port = 587
+                cfg.email.use_tls = True
+                cfg.email.username = email_addr.strip()
+                cfg.email.password = app_pass.strip().replace(" ", "")
+                cfg.email.sender_email = email_addr.strip()
+                cfg.email.recipient_email = recipient.strip()
+                cfg.email.enabled = True
+                config_mgr.save(cfg)
+                print("\n\033[1;32m✔ Gmail configuration saved!\033[0m")
+
+                test_e = prompt_text("Send an instant test email right now? (Y/n):", default="y").lower().startswith("y")
+                if test_e:
+                    from notifyseat.notifiers.email import EmailNotifier
+                    en = EmailNotifier(cfg.email)
+                    print("⏳ Sending test email...")
+                    if en.test():
+                        print(f"\033[1;32m✔ Test email SENT successfully to {recipient}!\033[0m\n")
+                    else:
+                        print("\033[1;31m✖ Email delivery failed. Please check your address and App Password.\033[0m\n")
+
+        elif p_idx == 1:
+            # Outlook
+            email_addr = prompt_text("Enter your Outlook / Hotmail address:", default=cfg.email.username or "")
+            pass_val = prompt_text("Enter your Outlook password / app password:", default=cfg.email.password or "")
+            recipient = prompt_text("Enter recipient email:", default=email_addr)
+
+            if email_addr and pass_val:
+                cfg.email.smtp_host = "smtp.office365.com"
+                cfg.email.smtp_port = 587
+                cfg.email.use_tls = True
+                cfg.email.username = email_addr.strip()
+                cfg.email.password = pass_val.strip()
+                cfg.email.sender_email = email_addr.strip()
+                cfg.email.recipient_email = recipient.strip()
+                cfg.email.enabled = True
+                config_mgr.save(cfg)
+                print("\n\033[1;32m✔ Outlook configuration saved!\033[0m")
+
+        elif p_idx == 2:
+            # Custom SMTP
+            host = prompt_text("SMTP Host (e.g. mail.domain.com):", default=cfg.email.smtp_host)
+            port = int(prompt_text("SMTP Port (e.g. 587 or 465):", default=str(cfg.email.smtp_port)))
+            user = prompt_text("Username / Email:", default=cfg.email.username)
+            password = prompt_text("Password:", default=cfg.email.password)
+            recip = prompt_text("Recipient Email:", default=cfg.email.recipient_email or user)
+
+            cfg.email.smtp_host = host
+            cfg.email.smtp_port = port
+            cfg.email.username = user
+            cfg.email.password = password
+            cfg.email.sender_email = user
+            cfg.email.recipient_email = recip
+            cfg.email.enabled = True
+            config_mgr.save(cfg)
+            print("\n\033[1;32m✔ Custom SMTP configuration saved!\033[0m")
+
+    elif choice == 2:
+        from notifyseat.notifiers.manager import NotificationManager
+        mgr = NotificationManager(cfg)
+        print("\n⏳ Testing all active notification channels...")
+        res = mgr.test_all()
+        for ch, ok in res.items():
+            if ok:
+                print(f"  \033[1;32m✔ [{ch.upper()}] Notification SUCCESSFUL!\033[0m")
+            else:
+                print(f"  \033[1;31m✖ [{ch.upper()}] Notification FAILED.\033[0m")
+        print()
