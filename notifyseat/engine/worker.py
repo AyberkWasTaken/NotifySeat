@@ -55,8 +55,6 @@ class TaskWorker:
 
         # State transition: 0 -> >0 or significant seat change
         if result.found and (prev_seats == 0 or new_seats != prev_seats):
-            logger.info(f"🚨 [SEATS AVAILABLE] Task '{task.name}': {new_seats} seat(s) detected! -> {result.message}")
-
             title = f"Seat Available: {task.origin} ➔ {task.destination}"
             body = result.message
             
@@ -89,6 +87,8 @@ class TaskWorker:
 
             self._emit_event("seats_found", {
                 "task_id": task.id,
+                "task": task,
+                "result": result,
                 "name": task.name,
                 "seats": new_seats,
                 "message": result.message,
@@ -107,6 +107,8 @@ class TaskWorker:
 
             self._emit_event("task_checked", {
                 "task_id": task.id,
+                "task": task,
+                "result": result,
                 "name": task.name,
                 "seats": new_seats,
                 "found": result.found,

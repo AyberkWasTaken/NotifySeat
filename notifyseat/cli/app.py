@@ -165,18 +165,17 @@ def render_track_check_table(task: TrackingTask, result):
 
             console.print(table)
             if result.found:
-                console.print(f"[bold green]✔ {result.message}[/bold green]")
+                console.print(f"[bold green]✔ Status: {result.seats_count} total available seat(s) detected across routes.[/bold green]\n")
             else:
-                console.print(f"[yellow]{result.message}[/yellow]")
-            console.print()
+                console.print(f"[yellow]● Status: All routes currently Sold Out. Monitoring for cancellations...[/yellow]\n")
         else:
             if result.found:
-                console.print(f"[bold green]{result.message}[/bold green]\n")
+                console.print(f"[bold green]✔ Status: {result.seats_count} seat(s) available.[/bold green]\n")
             else:
-                console.print(f"[yellow]{result.message}[/yellow]\n")
+                console.print(f"[yellow]● Status: Sold Out. Monitoring...[/yellow]\n")
     else:
         print(f"\n--- [{task.origin} -> {task.destination} ({task.date})] ---")
-        print(result.message)
+        print(f"Seats: {result.seats_count} | Found: {result.found}")
 
 
 def cmd_check_now(db: Database, config_mgr: ConfigManager, task_id: Optional[str] = None):
@@ -208,39 +207,44 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
 
     tasks = db.list_tasks(status=TaskStatus.ACTIVE)
     if not tasks:
-        print("⚠️ No active tasks in database! Adding a demo simulation task for you...")
+        print("⚠️ No active tasks in database! Adding a default tracker for you...")
         demo_task = TrackingTask(
-            name="Demo TCDD YHT Express",
-            transport_type=TransportType.SIMULATION,
+            name="İstanbul -> Eskişehir Tracker",
+            transport_type=TransportType.TCDD,
             origin="İstanbul(Söğütlüçeşme)",
             destination="Eskişehir",
             date=(datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
-            check_interval_seconds=8,
+            time_filter="evening",
+            check_interval_seconds=60,
             notification_channels=["desktop"]
         )
         db.create_task(demo_task)
         tasks = [demo_task]
 
-    print(f"\n[bold green]Starting NotifySeat Engine... Monitoring {len(tasks)} active route(s)[/bold green]" if HAS_RICH else f"Starting NotifySeat Engine for {len(tasks)} tasks...")
+    print(f"\n[bold green]Starting NotifySeat Engine... Monitoring {len(tasks)} active route(s) (1-minute cycle)[/bold green]" if HAS_RICH else f"Starting NotifySeat Engine for {len(tasks)} tasks...")
     print("Press Ctrl+C at any time to exit gracefully.\n")
 
     def on_event(event_type: str, data: dict):
-        ts = datetime.now().strftime("%H:%M:%S")
-        if event_type == "seats_found":
-            msg = data.get("message") or f"Found {data.get('seats')} seats on {data.get('name')}!"
-            if HAS_RICH:
-                console.print(Panel(
-                    f"[bold green]🚨 SEATS DETECTED![/bold green]\n\n"
-                    f"{msg}\n\n"
-                    f"[dim]Notification dispatched via configured channels.[/dim]",
-                    title="🎉 CANCELLATION OPENING FOUND",
-                    border_style="green"
-                ))
-            else:
-                print(f"\n\a[{ts}] 🚨 SEATS DETECTED! {msg}\n")
-        elif event_type == "task_checked":
+        task_obj = data.get("task")
+        result_obj = data.get("result")
+        
+        if task_obj and result_obj:
+            render_track_check_table(task_obj, result_obj)
+        else:
+            ts = datetime.now().strftime("%H:%M:%S")
             msg = data.get("message") or f"Checked {data.get('name')}: {data.get('seats', 0)} seats."
             print(f"[{ts}] {msg}")
+
+        if event_type == "seats_found":
+            if HAS_RICH:
+                console.print(Panel(
+                    f"[bold green]🚨 CANCELLATION OPENING DETECTED![/bold green]\n\n"
+                    f"Route: [bold white]{data.get('name')}[/bold white]\n"
+                    f"Seats Available: [bold yellow]{data.get('seats')}[/bold yellow]\n\n"
+                    f"[dim]Notification dispatched via desktop chime & active channels.[/dim]",
+                    title="🎉 INSTANT ALERT",
+                    border_style="green"
+                ))
 
     scheduler.subscribe_events(on_event)
     scheduler.start()
