@@ -49,7 +49,7 @@ class WhatsAppNotifier(BaseNotifier):
 
         text = f"🚨 *{title}*\n\n{message}"
         if task:
-            text += f"\n\n🚆 *Route:* {task.origin} ➔ {task.destination}\n📅 *Date:* {task.date}"
+            text += f"\n\n🚆 *Route:* {task.origin} ➔ {task.destination}\n📅 *Date:* {task.display_date}"
         if data and data.get("booking_url"):
             text += f"\n🔗 *Book Now:* {data['booking_url']}"
 

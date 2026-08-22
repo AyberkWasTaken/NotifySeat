@@ -73,7 +73,7 @@ def cmd_list(db: Database):
             table.add_row(
                 str(t.id),
                 f"{t.origin} ➔ {t.destination}",
-                t.date,
+                t.display_date,
                 window_label,
                 status_badge,
                 seats_display,
@@ -84,7 +84,7 @@ def cmd_list(db: Database):
     else:
         print("\n--- Monitored Routes ---")
         for t in tasks:
-            print(f"[{t.id}] {t.origin} -> {t.destination} ({t.date}) | Status: {t.status} | Seats: {t.last_found_seats}")
+            print(f"[{t.id}] {t.origin} -> {t.destination} ({t.display_date}) | Status: {t.status} | Seats: {t.last_found_seats}")
         print()
 
 
@@ -100,9 +100,9 @@ def cmd_track(db: Database, args: argparse.Namespace):
             transport_type=TransportType.from_str(args.transport),
             origin=args.origin,
             destination=args.destination,
-            date=args.date or (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
+            date=args.date or (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y"),
             time_filter=args.time,
-            check_interval_seconds=args.interval or 30,
+            check_interval_seconds=args.interval or 60,
             notification_channels=channels,
             status=TaskStatus.ACTIVE
         )
@@ -114,7 +114,7 @@ def render_track_check_table(task: TrackingTask, result):
     window_label = task.time_filter.title() if task.time_filter else "All Day"
     title_text = (
         f"[bold cyan]🚆 Route:[/bold cyan] [bold white]{task.origin} ➔ {task.destination}[/bold white]   "
-        f"[bold cyan]📅 Date:[/bold cyan] [bold yellow]{task.date}[/bold yellow]   "
+        f"[bold cyan]📅 Date:[/bold cyan] [bold yellow]{task.display_date}[/bold yellow]   "
         f"[bold cyan]🕒 Window:[/bold cyan] [bold green]{window_label}[/bold green]   "
         f"[bold cyan]🆔 ID:[/bold cyan] [dim]{task.id}[/dim]"
     )

@@ -61,6 +61,40 @@ class ServiceInfo:
         return asdict(self)
 
 
+def format_display_date(date_str: str) -> str:
+    """Converts YYYY-MM-DD to DD-MM-YYYY (day first, month in the middle) for display."""
+    if not date_str:
+        return ""
+    try:
+        clean = date_str.strip().replace(".", "-").replace("/", "-")
+        parts = clean.split("-")
+        if len(parts) == 3:
+            if len(parts[0]) == 4:  # YYYY-MM-DD -> DD-MM-YYYY
+                return f"{parts[2]}-{parts[1]}-{parts[0]}"
+            elif len(parts[2]) == 4:  # Already DD-MM-YYYY
+                return f"{parts[0]}-{parts[1]}-{parts[2]}"
+    except Exception:
+        pass
+    return date_str
+
+
+def normalize_date_input(date_str: str) -> str:
+    """Normalizes any date format (DD-MM-YYYY, DD.MM.YYYY, DD/MM/YYYY, YYYY-MM-DD) to ISO YYYY-MM-DD."""
+    if not date_str:
+        return ""
+    try:
+        clean = date_str.strip().replace(".", "-").replace("/", "-")
+        parts = clean.split("-")
+        if len(parts) == 3:
+            if len(parts[0]) == 4:  # YYYY-MM-DD
+                return f"{parts[0]}-{parts[1].zfill(2)}-{parts[2].zfill(2)}"
+            elif len(parts[2]) == 4:  # DD-MM-YYYY -> YYYY-MM-DD
+                return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+    except Exception:
+        pass
+    return date_str
+
+
 @dataclass
 class TrackingTask:
     """Represents a route tracking task saved by the user."""
@@ -75,7 +109,7 @@ class TrackingTask:
     time_filter: Optional[str] = None  # e.g., "08:00-14:00" or specific hour "09:15"
     min_seats: int = 1
     seat_class: str = "ANY"  # ANY, ECONOMY, BUSINESS, PULMAN, YATAKLI
-    check_interval_seconds: int = 30
+    check_interval_seconds: int = 60
     notification_channels: List[str] = field(default_factory=lambda: ["desktop"])
     status: TaskStatus = TaskStatus.ACTIVE
     last_checked_at: Optional[str] = None
@@ -84,13 +118,19 @@ class TrackingTask:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     auto_stop_on_found: bool = False
 
+    @property
+    def display_date(self) -> str:
+        return format_display_date(self.date)
+
     def __post_init__(self):
+        if self.date:
+            self.date = normalize_date_input(self.date)
         if isinstance(self.transport_type, str):
             self.transport_type = TransportType.from_str(self.transport_type)
         if isinstance(self.status, str):
             self.status = TaskStatus(self.status)
         if not self.name:
-            self.name = f"{self.origin} -> {self.destination} ({self.date})"
+            self.name = f"{self.origin} -> {self.destination} ({self.display_date})"
 
     def to_dict(self) -> Dict[str, Any]:
         res = asdict(self)

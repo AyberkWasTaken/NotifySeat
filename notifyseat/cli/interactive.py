@@ -66,8 +66,8 @@ def interactive_create_task() -> Optional[TrackingTask]:
         destination = prompt_text("Enter Arrival Station/City/Airport:", default="Ankara Gar")
 
     # 2. Date
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-    date_str = prompt_text("Enter Travel Date (YYYY-MM-DD):", default=tomorrow)
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y")
+    date_str = prompt_text("Enter Travel Date (DD-MM-YYYY):", default=tomorrow)
 
     # 3. Time Filter
     time_choices = [
@@ -108,7 +108,7 @@ def interactive_create_task() -> Optional[TrackingTask]:
     print("\n\033[1;32m✔ Route tracker configured successfully!\033[0m")
     print(f"  • Mode: {task.transport_type.upper()}")
     print(f"  • Route: {task.origin} ➔ {task.destination}")
-    print(f"  • Date: {task.date}")
+    print(f"  • Date: {task.display_date}")
     print(f"  • Radar: Checks every 60 seconds\n")
     return task
 

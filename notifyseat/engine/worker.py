@@ -75,7 +75,7 @@ class TaskWorker:
             body = (
                 f"🚨 CANCELLATION DETECTED!\n"
                 f"🚆 Route: {task.origin} ➔ {task.destination}\n"
-                f"📅 Date: {task.date}\n\n"
+                f"📅 Date: {task.display_date}\n\n"
                 f"💺 Available Seats:\n{details_text}\n\n"
                 f"🔗 Book Immediately: https://ebilet.tcddtasimacilik.gov.tr"
             )

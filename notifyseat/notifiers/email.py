@@ -40,7 +40,7 @@ class EmailNotifier(BaseNotifier):
         # Plain text version
         text_content = f"{title}\n\n{message}\n"
         if task:
-            text_content += f"\nRoute: {task.origin} -> {task.destination}\nDate: {task.date}\nTransport: {task.transport_type.upper()}\n"
+            text_content += f"\nRoute: {task.origin} -> {task.destination}\nDate: {task.display_date}\nTransport: {task.transport_type.upper()}\n"
         if data and data.get("booking_url"):
             text_content += f"\nBooking Link: {data['booking_url']}\n"
 
@@ -60,7 +60,7 @@ class EmailNotifier(BaseNotifier):
             task_info = f"""
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
                 <tr><td style="padding: 6px; color: #6b7280;">Route:</td><td style="padding: 6px; font-weight: bold;">{task.origin} ➔ {task.destination}</td></tr>
-                <tr><td style="padding: 6px; color: #6b7280;">Date:</td><td style="padding: 6px; font-weight: bold;">{task.date}</td></tr>
+                <tr><td style="padding: 6px; color: #6b7280;">Date:</td><td style="padding: 6px; font-weight: bold;">{task.display_date}</td></tr>
                 <tr><td style="padding: 6px; color: #6b7280;">Transport:</td><td style="padding: 6px; font-weight: bold;">{task.transport_type.upper()}</td></tr>
             </table>
             """
