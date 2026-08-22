@@ -67,12 +67,10 @@
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">⚡</div>
+        <div class="stat-icon">⏱️</div>
         <div class="stat-info">
-          <h3>Quick Demo</h3>
-          <button class="btn btn-sm btn-secondary" style="margin-top: 0.3rem;" onclick="triggerInstantDemo()">
-            🧪 Run Live Cancellation Test
-          </button>
+          <h3>Radar Frequency</h3>
+          <div class="stat-value" style="font-size: 1.2rem; color: var(--accent-blue);">Every 1 Minute</div>
         </div>
       </div>
     </div>
@@ -86,7 +84,7 @@
     <div class="tasks-grid" id="tasksContainer">
       <!-- Tasks rendered dynamically -->
       <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted);">
-        No routes being monitored yet. Click <b>+ Add Route</b> or <b>Run Live Cancellation Test</b> to start!
+        No routes being monitored yet. Click <b>+ Add Route</b> to start!
       </div>
     </div>
 
@@ -116,7 +114,6 @@
         <button class="tab-btn active" onclick="switchTransportTab('tcdd')">🚅 TCDD Train</button>
         <button class="tab-btn" onclick="switchTransportTab('flight')">✈️ Flight</button>
         <button class="tab-btn" onclick="switchTransportTab('bus')">🚌 Intercity Bus</button>
-        <button class="tab-btn" onclick="switchTransportTab('simulation')">🧪 Demo Sim</button>
       </div>
 
       <form id="newTaskForm" onsubmit="handleCreateTask(event)">
@@ -156,21 +153,14 @@
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <label for="checkInterval">Check Interval (Seconds)</label>
-            <input type="number" class="form-control" id="checkInterval" value="30" min="5" max="3600">
-          </div>
-          <div class="form-group">
-            <label for="seatClass">Seat Class</label>
-            <select class="form-control" id="seatClass">
-              <option value="ANY">Any Class</option>
-              <option value="Pulman">2+1 Pulman</option>
-              <option value="Business">Business</option>
-              <option value="Economy">Economy</option>
-              <option value="Yataklı">Yataklı (Sleeper)</option>
-            </select>
-          </div>
+        <div class="form-group">
+          <label for="seatClass">Seat Class Preference</label>
+          <select class="form-control" id="seatClass">
+            <option value="ANY">Any Class (Business, Ekonomi, Yataklı, Özel)</option>
+            <option value="Business">Business Class Only</option>
+            <option value="Economy">Ekonomi Only</option>
+            <option value="Yataklı">Yataklı (Sleeper) Only</option>
+          </select>
         </div>
 
         <div class="form-group">

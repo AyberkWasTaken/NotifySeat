@@ -258,45 +258,6 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
         print("✔ NotifySeat stopped.")
 
 
-def cmd_demo(db: Database, config_mgr: ConfigManager):
-    """Runs an instant interactive demo showing seat detection and notification."""
-    print_banner()
-    print("\n🎬 \033[1;33mRUNNING INSTANT LIVE DEMO (Seat Cancellation Scenario)\033[0m")
-    print("This will simulate a sold-out train where a passenger cancels their ticket live!\n")
-
-    demo_task = TrackingTask(
-        name="İstanbul(Söğütlüçeşme) ➔ Eskişehir YHT (Live Demo)",
-        transport_type=TransportType.SIMULATION,
-        origin="İstanbul(Söğütlüçeşme)",
-        destination="Eskişehir",
-        date=(datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"),
-        check_interval_seconds=4,
-        notification_channels=["desktop"]
-    )
-    db.create_task(demo_task)
-
-    cfg = config_mgr.get()
-    notifier_mgr = NotificationManager(cfg, db)
-    scheduler = EngineScheduler(db, cfg, notifier_mgr)
-
-    def on_event(event_type: str, data: dict):
-        ts = datetime.now().strftime("%H:%M:%S")
-        if event_type == "seats_found":
-            print(f"\n\a\033[1;32m[{ts}] 🎉 BREAKING: PASSENGER CANCELLATION DETECTED!\033[0m")
-            print(f"  • {data.get('message')}")
-            print(f"  • Status: Alert dispatched to Desktop / Audio Chime / Telegram!\n")
-        elif event_type == "task_checked":
-            print(f"[{ts}] 🔍 Checking route... Status: Train is currently SOLD OUT (0 seats). Waiting...")
-
-    scheduler.subscribe_events(on_event)
-    scheduler.start()
-
-    print("Step 1: Checking sold out train...")
-    time.sleep(12)
-    scheduler.stop()
-    print("\n\033[1;32m✔ Demo completed successfully! Working end-to-end.\033[0m\n")
-
-
 def cmd_test_notify(config_mgr: ConfigManager, channel: str):
     cfg = config_mgr.get()
     mgr = NotificationManager(cfg)
@@ -306,105 +267,6 @@ def cmd_test_notify(config_mgr: ConfigManager, channel: str):
         print(f"\033[1;32m✔ Test notification for '{channel}' was SUCCESSFUL!\033[0m")
     else:
         print(f"\033[1;31m✖ Test notification for '{channel}' failed. Please check configuration settings.\033[0m")
-
-
-def cmd_connect_tcdd(config_mgr: ConfigManager):
-    print("\n🌐 Launching interactive browser to connect TCDD live session...")
-    print("👉 Please select your route and click 'Ara' (Search) in the browser window.")
-    print("👉 NotifySeat will capture your live session parameters and test the route immediately.\n")
-    try:
-        import json
-        from pathlib import Path
-        from playwright.sync_api import sync_playwright
-
-        session_file = Path.home() / ".notifyseat" / "tcdd_session.json"
-        db = Database()
-
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=False,
-                args=["--disable-blink-features=AutomationControlled"]
-            )
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                locale="tr-TR"
-            )
-            page = context.new_page()
-
-            captured_tokens = []
-            captured_headers = {}
-
-            def on_req(req):
-                url = req.url
-                auth = req.headers.get("authorization", "")
-                
-                # If Bearer token is found on ANY request
-                if auth and "Bearer" in auth:
-                    token = auth.replace("Bearer", "").strip()
-                    if len(token) > 50 and token not in captured_tokens:
-                        captured_tokens.append(token)
-                        captured_headers.update(dict(req.headers))
-                        cfg = config_mgr.get()
-                        cfg.tcdd_token = token
-                        config_mgr.save(cfg)
-                        print(f"🔑 Live Token captured! ({token[:20]}...)")
-
-                if req.method == "POST" and "tcddtasimacilik.gov.tr" in url:
-                    captured_headers.update(dict(req.headers))
-                    print(f"📡 [POST] {url}")
-
-            page.on("request", on_req)
-
-            try:
-                page.goto("https://ebilet.tcddtasimacilik.gov.tr", wait_until="commit", timeout=60000)
-            except Exception as e:
-                logger.debug(f"Navigation warning: {e}")
-
-            # Keep window open until user closes it or searches
-            for _ in range(300):
-                try:
-                    if page.is_closed():
-                        break
-                    # If on search results page or token was captured
-                    if ("sefer-listesi" in page.url or "bilet" in page.url) and captured_tokens:
-                        time.sleep(2)
-                        break
-                except Exception:
-                    break
-                time.sleep(1)
-
-            # Save full session cookies before closing
-            try:
-                cookies_list = context.cookies()
-                cookies_dict = {c["name"]: c["value"] for c in cookies_list}
-                session_data = {
-                    "timestamp": time.time(),
-                    "token": captured_tokens[0] if captured_tokens else config_mgr.get().tcdd_token,
-                    "headers": captured_headers,
-                    "cookies": cookies_dict
-                }
-                session_file.parent.mkdir(parents=True, exist_ok=True)
-                with open(session_file, "w", encoding="utf-8") as f:
-                    json.dump(session_data, f, indent=2)
-            except Exception:
-                pass
-
-            browser.close()
-
-            print("\n✔ TCDD live session successfully synced!")
-            print("⚡ Triggering immediate live route check with your session...\n")
-            tasks = db.list_tasks()
-            active_tcdd_tasks = [t for t in tasks if t.transport_type == "tcdd" and t.status == TaskStatus.ACTIVE]
-            if active_tcdd_tasks:
-                for t in active_tcdd_tasks:
-                    cmd_check_now(db, config_mgr, t.id)
-            else:
-                print("No active TCDD tasks found. Create one with: python3 main.py track")
-
-    except Exception as e:
-        print(f"Browser connection error: {e}")
-    except Exception as e:
-        print(f"Browser connection error: {e}")
 
 
 def main():
@@ -424,8 +286,7 @@ def main():
     track_p.add_argument("--from", dest="origin", help="Departure station/airport/city")
     track_p.add_argument("--to", dest="destination", help="Arrival station/airport/city")
     track_p.add_argument("--date", help="Travel date (YYYY-MM-DD)")
-    track_p.add_argument("--time", help="Time filter (e.g. morning, 16:35, 08:00-14:00)")
-    track_p.add_argument("--interval", type=int, default=30, help="Check frequency in seconds")
+    track_p.add_argument("--time", help="Time filter (e.g. morning, afternoon, evening, all)")
     track_p.add_argument("--channels", default="desktop", help="Comma-separated channels: desktop,telegram,discord,email,sms,webhook")
 
     # check
@@ -435,9 +296,6 @@ def main():
     # run
     subparsers.add_parser("run", help="Start monitoring engine in foreground")
     subparsers.add_parser("start", help="Alias for run")
-
-    # demo
-    subparsers.add_parser("demo", help="Run an instant live cancellation demo")
 
     # gui
     gui_p = subparsers.add_parser("gui", help="Launch the local Web GUI dashboard")
@@ -458,14 +316,6 @@ def main():
     r_p = subparsers.add_parser("resume", help="Resume a tracking task")
     r_p.add_argument("task_id", help="Task ID")
 
-    # set-token
-    tok_p = subparsers.add_parser("set-token", help="Set TCDD Web/Mobile session Bearer token")
-    tok_p.add_argument("token", help="Bearer token copied from TCDD web app / devtools")
-
-    # connect-tcdd
-    subparsers.add_parser("connect-tcdd", help="Open browser to capture active TCDD session automatically")
-    subparsers.add_parser("connect", help="Alias for connect-tcdd")
-
     args = parser.parse_args()
 
     db = Database()
@@ -477,14 +327,13 @@ def main():
         print("\nCommands available:")
         print("  notifyseat track         ➔ Add a new route to monitor")
         print("  notifyseat run           ➔ Start the background monitoring engine")
-        print("  notifyseat check <id>    ➔ Trigger immediate check for a task")
-        print("  notifyseat connect-tcdd  ➔ Open browser and connect TCDD session automatically")
-        print("  notifyseat set-token <tok> ➔ Set active TCDD session bearer token")
-        print("  notifyseat demo          ➔ Run an instant live cancellation demo")
+        print("  notifyseat check [id]    ➔ Trigger immediate live check (or check all)")
+        print("  notifyseat list          ➔ View all configured routes")
         print("  notifyseat gui           ➔ Launch the local Web GUI dashboard")
-        print("  notifyseat list          ➔ View all configured tasks")
         print("  notifyseat test-notify   ➔ Test Telegram, Discord, Email, Desktop alert")
-        print("  notifyseat delete <id>   ➔ Delete a task\n")
+        print("  notifyseat delete <id>   ➔ Delete a task")
+        print("  notifyseat pause <id>    ➔ Pause monitoring for a task")
+        print("  notifyseat resume <id>   ➔ Resume monitoring for a task\n")
         return
 
     if args.command == "list":
@@ -495,15 +344,6 @@ def main():
         cmd_check_now(db, config_mgr, args.task_id)
     elif args.command in ("run", "start"):
         cmd_run(db, config_mgr, args)
-    elif args.command in ("connect-tcdd", "connect"):
-        cmd_connect_tcdd(config_mgr)
-    elif args.command == "set-token":
-        cfg = config_mgr.get()
-        cfg.tcdd_token = args.token.strip().replace("Bearer ", "")
-        config_mgr.save(cfg)
-        print(f"✔ TCDD Bearer token saved successfully!")
-    elif args.command == "demo":
-        cmd_demo(db, config_mgr)
     elif args.command == "test-notify":
         cmd_test_notify(config_mgr, args.channel)
     elif args.command == "delete":

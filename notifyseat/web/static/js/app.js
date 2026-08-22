@@ -282,32 +282,6 @@ async function deleteTask(taskId) {
   }
 }
 
-async function triggerInstantDemo() {
-  appendLog(`🧪 Starting instant live seat cancellation demo...`, 'log-alert');
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 2);
-  
-  await fetch('/api/tasks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      transport_type: 'simulation',
-      origin: 'İstanbul(Söğütlüçeşme)',
-      destination: 'Eskişehir',
-      date: tomorrow.toISOString().split('T')[0],
-      check_interval_seconds: 5,
-      notification_channels: ['desktop']
-    })
-  });
-  
-  // Ensure engine is running
-  if (!isEngineRunning) {
-    await toggleEngine();
-  }
-  loadTasks();
-  loadStats();
-}
-
 // --- Modals & Tabs ---
 
 function openNewTaskModal() {
@@ -367,7 +341,7 @@ async function handleCreateTask(e) {
     destination: document.getElementById('destInput').value,
     date: document.getElementById('travelDate').value,
     time_filter: document.getElementById('timeFilter').value || null,
-    check_interval_seconds: parseInt(document.getElementById('checkInterval').value) || 30,
+    check_interval_seconds: 60,
     seat_class: document.getElementById('seatClass').value,
     notification_channels: channels
   };
