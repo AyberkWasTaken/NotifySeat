@@ -137,22 +137,31 @@ def interactive_config(config_mgr):
 
     if choice == 0:
         # WhatsApp Setup
-        print("\n\033[1;32m--- 📱 WhatsApp Direct Alert Setup (CallMeBot) ---\033[0m")
-        print("We will open WhatsApp for you with the authorization message pre-filled.")
-        print("1. Click Send on WhatsApp.")
-        print("2. CallMeBot will reply with your API Key (e.g. 123456).")
-        print("3. Paste the API key into the prompt below.\n")
+        print("\n\033[1;32m--- 📱 WhatsApp Direct Alert Setup (CallMeBot) ---\033[0m\n")
+        print("To allow NotifySeat to send WhatsApp alerts to your phone, CallMeBot needs 1 verification message:")
+        print("  • Message to send: \033[1;33mI allow callmebot to send me messages\033[0m")
+        print("  • Bot Phone Number: \033[1;36m+34 623 78 95 80\033[0m\n")
 
-        open_now = prompt_text("Open WhatsApp authorization link now? (Y/n):", default="y").lower().startswith("y")
-        if open_now:
+        wa_choices = [
+            "🌐 Open WhatsApp Web / Desktop app automatically on this computer",
+            "📲 I will send the message manually from my mobile phone WhatsApp"
+        ]
+        w_mode = prompt_choice("How would you like to authorize WhatsApp?", wa_choices, default_idx=0)
+
+        if w_mode == 0:
             try:
-                webbrowser.open("https://wa.me/34911061400?text=I+allow+callmebot+to+send+me+messages")
-                print("🌐 Opened WhatsApp.")
+                webbrowser.open("https://wa.me/34623789580?text=I+allow+callmebot+to+send+me+messages")
+                print("\n🌐 Opened WhatsApp link with pre-filled message.")
             except Exception:
                 pass
+        else:
+            print("\n📲 Please open WhatsApp on your phone:")
+            print("  1. Message \033[1;36m+34 623 78 95 80\033[0m")
+            print("  2. Send: \033[1;33mI allow callmebot to send me messages\033[0m")
+            print("  3. CallMeBot will reply with your API Key (e.g. 123456).\n")
 
         phone = prompt_text("Enter your WhatsApp Phone Number (with country code, e.g. +905321234567):", default=cfg.whatsapp.phone_number or "+90")
-        apikey = prompt_text("Enter the API Key sent by CallMeBot (e.g. 123456):", default=cfg.whatsapp.apikey)
+        apikey = prompt_text("Enter the API Key sent to you by CallMeBot (e.g. 123456):", default=cfg.whatsapp.apikey)
 
         if phone and apikey:
             cfg.whatsapp.phone_number = phone.strip()
@@ -161,7 +170,7 @@ def interactive_config(config_mgr):
             config_mgr.save(cfg)
             print("\n\033[1;32m✔ WhatsApp configuration saved!\033[0m")
 
-            test_now = prompt_text("Send an instant test WhatsApp message to your phone? (Y/n):", default="y").lower().startswith("y")
+            test_now = prompt_text("Send an instant test WhatsApp alert to your phone? (Y/n):", default="y").lower().startswith("y")
             if test_now:
                 from notifyseat.notifiers.whatsapp import WhatsAppNotifier
                 wn = WhatsAppNotifier(cfg.whatsapp)
