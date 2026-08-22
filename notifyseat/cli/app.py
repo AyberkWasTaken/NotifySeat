@@ -124,20 +124,21 @@ def render_track_check_table(task: TrackingTask, result):
         console.print(Panel(title_text, expand=True, border_style="cyan"))
 
         if result.services:
-            table = Table(show_header=True, header_style="bold magenta", border_style="dim white", expand=True)
-            table.add_column("Departure", justify="center", style="bold yellow", width=14)
-            table.add_column("Train & Service", justify="left", style="white", min_width=25)
-            table.add_column("Status", justify="center", width=14)
-            table.add_column("Business", justify="center", width=10)
-            table.add_column("Ekonomi", justify="center", width=10)
-            table.add_column("Özel / Engelli", justify="center", width=15)
-            table.add_column("Min Price", justify="center", style="bold green", width=12)
+            table = Table(show_header=True, header_style="bold magenta", border_style="dim white")
+            table.add_column("Departure", justify="center", style="bold yellow")
+            table.add_column("Train No", justify="center", style="bold cyan")
+            table.add_column("Status", justify="center")
+            table.add_column("Business", justify="center")
+            table.add_column("Ekonomi", justify="center")
+            table.add_column("Özel / Engelli", justify="center")
+            table.add_column("Min Price", justify="center", style="bold green")
 
             for s in result.services:
                 dep = s.departure_time or "??"
                 arr = s.arrival_time or ""
                 dep_str = f"{dep} ➔ {arr}" if arr else dep
-                name = s.service_name
+                train_no = s.service_id or s.service_name.split()[0]
+
                 seats = s.total_available_seats
                 bd = s.class_breakdown
                 price = s.price
@@ -160,7 +161,7 @@ def render_track_check_table(task: TrackingTask, result):
                     ozel_cell = "[dim red]0[/dim red]"
                     price_cell = "[dim]-[/dim]"
 
-                table.add_row(dep_str, name, status_cell, bus_cell, eko_cell, ozel_cell, price_cell)
+                table.add_row(dep_str, train_no, status_cell, bus_cell, eko_cell, ozel_cell, price_cell)
 
             console.print(table)
             if result.found:
