@@ -3,7 +3,8 @@ import urllib.request
 import json
 import re
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from notifyseat.providers.base import BaseProvider
 from notifyseat.core.models import TrackingTask, CheckResult, TransportType, ServiceInfo
 from notifyseat.core.logger import logger
@@ -69,8 +70,10 @@ class TCDDProvider(BaseProvider):
         "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/train/load-trains-by-station-and-date"
     ]
     
-    # Production JWT fallback list
-    JWT_TOKENS = []
+    # Production JWT token list
+    JWT_TOKENS = [
+        "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJlVFFicDhDMmpiakp1cnUzQVk2a0ZnV196U29MQXZIMmJ5bTJ2OUg5THhRIn0.eyJleHAiOjE3MjEzODQ0NzAsImlhdCI6MTcyMTM4NDQxMCwianRpIjoiYWFlNjVkNzgtNmRkZS00ZGY4LWEwZWYtYjRkNzZiYjZlODNjIiwiaXNzIjoiaHR0cDovL3l0cC1wcm9kLW1hc3RlcjEudGNkZHRhc2ltYWNpbGlrLmdvdi50cjo4MDgwL3JlYWxtcy9tYXN0ZXIiLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiMDAzNDI3MmMtNTc2Yi00OTBlLWJhOTgtNTFkMzc1NWNhYjA3IiwidHlwIjoiQmVhcmVyIiwiYXpwIjoidG1zIiwic2Vzc2lvbl9zdGF0ZSI6IjAwYzM4NTJiLTg1YjEtNDMxNS04OGIwLWQ0MWMxMTcyYzA0MSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsiZGVmYXVsdC1yb2xlcy1tYXN0ZXIiLCJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJvcGVuaWQgZW1haWwgcHJvZmlsZSIsInNpZCI6IjAwYzM4NTJiLTg1YjEtNDMxNS04OGIwLWQ0MWMxMTcyYzA0MSIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwicHJlZmVycmVkX3VzZXJuYW1lIjoid2ViIiwiZ2l2ZW5fbmFtZSI6IiIsImZhbWlseV9uYW1lIjoiIn0.AIW_4Qws2wfwxyVg8dgHRT9jB3qNavob2C4mEQIQGl3urzW2jALPx-e51ZwHUb-TXB-X2RPHakonxKnWG6tDIP5aKhiidzXDcr6pDDoYU5DnQhMg1kywyOaMXsjLFjuYN5PAyGUMh6YSOVsg1PzNh-5GrJF44pS47JnB9zk03Pr08napjsZPoRB-5N4GQ49cnx7ePC82Y7YIc-gTew2baqKQPz9_v381Gbm2V38PZDH9KldlcWut7kqQYJFMJ7dkM_entPJn9lFk7R5h5j_06OlQEpWRMQTn9SQ1AYxxmZxBu5XYMKDkn4rzIIVCkdTPJNCt5PvjENjClKFeUA1DOg"
+    ]
 
     @property
     def transport_type(self) -> TransportType:
@@ -217,16 +220,18 @@ class TCDDProvider(BaseProvider):
         cookie_header = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()]) if cookies_dict else ""
 
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Origin": "https://ebilet.tcddtasimacilik.gov.tr",
-            "Referer": "https://ebilet.tcddtasimacilik.gov.tr/",
-            "Content-Type": "application/json;charset=UTF-8",
+            "Host": "web-api-prod-ytp.tcddtasimacilik.gov.tr",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:154.0) Gecko/20100101 Firefox/154.0",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "tr",
             "unit-id": "3895",
-            "channelId": "3",
-            "Accept": "application/json, text/plain, */*"
+            "Content-Type": "application/json",
+            "Origin": "https://ebilet.tcddtasimacilik.gov.tr",
+            "Sec-GPC": "1",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site"
         }
-        if saved_session.get("headers"):
-            headers.update(saved_session["headers"])
         if cookie_header:
             headers["Cookie"] = cookie_header
 
@@ -256,30 +261,28 @@ class TCDDProvider(BaseProvider):
 
         tokens_to_try = []
         if custom_token:
-            tokens_to_try.append(custom_token)
+            clean_tok = custom_token.replace("Bearer ", "").strip()
+            tokens_to_try.append(clean_tok)
         tokens_to_try.extend(self.JWT_TOKENS)
 
         endpoints = [
             "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/train/train-availability?environment=dev&userId=1",
-            "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/train/train-availability",
-            "https://api-yebsp.tcddtasimacilik.gov.tr/train/train-availability"
+            "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/train/train-availability"
         ]
 
+        import requests
+
         for token in tokens_to_try:
-            headers["Authorization"] = f"Bearer {token}"
+            headers["Authorization"] = token
             for endpoint in endpoints:
                 try:
-                    req = urllib.request.Request(
-                        endpoint,
-                        data=json.dumps(payload).encode("utf-8"),
-                        headers=headers,
-                        method="POST"
-                    )
-                    with urllib.request.urlopen(req, timeout=6) as res:
-                        raw = res.read().decode("utf-8")
-                        data = json.loads(raw)
+                    r = requests.post(endpoint, json=payload, headers=headers, timeout=10)
+                    if r.status_code == 200:
+                        data = r.json()
                         if isinstance(data, (list, dict)) and data:
-                            return self._parse_ytp_response(task, data, origin_name, dest_name)
+                            parsed = self._parse_ytp_response(task, data, origin_name, dest_name)
+                            if parsed and parsed.services:
+                                return parsed
                 except Exception as e:
                     logger.debug(f"YTP API probe error on {endpoint}: {e}")
                     continue
@@ -334,10 +337,16 @@ class TCDDProvider(BaseProvider):
                             if not cls_name:
                                 if cls_id == 1:
                                     cls_name = "Pulman"
-                                elif cls_id in (2, 7):
+                                elif cls_id in (2, 4):
                                     cls_name = "Business"
+                                elif cls_id == 7:
+                                    cls_name = "Yataklı"
+                                elif cls_id == 23:
+                                    cls_name = "Engelli"
+                                elif cls_id == 22:
+                                    cls_name = "Loca"
                                 else:
-                                    cls_name = f"Class {cls_id}"
+                                    cls_name = f"Sınıf {cls_id}"
                             
                             seats = int(cap.get("availableSeats") or cap.get("capacity") or cap.get("seatCount") or 0)
                             if task.seat_class and task.seat_class != "ANY":
