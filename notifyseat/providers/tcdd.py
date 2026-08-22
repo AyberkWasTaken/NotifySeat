@@ -291,9 +291,93 @@ class TCDDProvider(BaseProvider):
         return None
 
     def _parse_ytp_response(self, task: TrackingTask, data: Any, origin_name: str, dest_name: str) -> CheckResult:
-        """Parses TCDD JSON response (list or dictionary) and extracts all train trips, times, and seat breakdowns."""
+        """Parses TCDD JSON response (including modern trainLegs structure) and extracts all trips, times, and seats."""
         services: List[ServiceInfo] = []
         total_seats = 0
+
+        # Handle modern trainLegs structure
+        if isinstance(data, dict) and "trainLegs" in data:
+            for leg in data.get("trainLegs", []):
+                for avail in leg.get("trainAvailabilities", []):
+                    for train in avail.get("trains", []):
+                        train_name = train.get("commercialName") or train.get("name") or f"YHT {train.get('number', '')}"
+                        train_num = str(train.get("number") or train.get("id", ""))
+                        
+                        # Extract departure / arrival from segments (timestamps in ms)
+                        dep_time = ""
+                        arr_time = ""
+                        segments = train.get("segments", [])
+                        if segments:
+                            dep_ts = segments[0].get("departureTime")
+                            arr_ts = segments[-1].get("arrivalTime")
+                            if dep_ts:
+                                dep_dt = datetime.fromtimestamp(dep_ts / 1000.0) if dep_ts > 100000000000 else datetime.fromtimestamp(dep_ts)
+                                dep_time = dep_dt.strftime("%H:%M")
+                            if arr_ts:
+                                arr_dt = datetime.fromtimestamp(arr_ts / 1000.0) if arr_ts > 100000000000 else datetime.fromtimestamp(arr_ts)
+                                arr_time = arr_dt.strftime("%H:%M")
+                        
+                        if not dep_time:
+                            dep_time = train.get("departureTime", "")
+
+                        # Filter by time if requested
+                        if task.time_filter and not self._match_time_filter(dep_time, task.time_filter):
+                            continue
+
+                        # Extract seats from bookingClassCapacities / wagons
+                        class_breakdown = {}
+                        train_seats = 0
+                        capacities = train.get("bookingClassCapacities", []) or train.get("wagons", [])
+                        for cap in capacities:
+                            cls_id = cap.get("bookingClassId") or cap.get("id")
+                            cls_name = cap.get("name") or cap.get("bookingClassName")
+                            if not cls_name:
+                                if cls_id == 1:
+                                    cls_name = "Pulman"
+                                elif cls_id in (2, 7):
+                                    cls_name = "Business"
+                                else:
+                                    cls_name = f"Class {cls_id}"
+                            
+                            seats = int(cap.get("availableSeats") or cap.get("capacity") or cap.get("seatCount") or 0)
+                            if task.seat_class and task.seat_class != "ANY":
+                                if task.seat_class.lower() not in cls_name.lower():
+                                    continue
+                            class_breakdown[cls_name] = seats
+                            train_seats += seats
+
+                        if train_seats > 0:
+                            services.append(ServiceInfo(
+                                service_id=train_num,
+                                service_name=f"{train_num} - {train_name}",
+                                departure_time=dep_time,
+                                arrival_time=arr_time,
+                                origin=origin_name,
+                                destination=dest_name,
+                                date=task.date,
+                                total_available_seats=train_seats,
+                                class_breakdown=class_breakdown,
+                                booking_url=self.BOOKING_URL,
+                                operator="TCDD Taşımacılık",
+                                notes=f"Found {train_seats} empty seats on {dep_time} route from {origin_name} to {dest_name}"
+                            ))
+                            total_seats += train_seats
+
+            found = total_seats >= task.min_seats
+            if found:
+                descriptions = [f"found {s.total_available_seats} empty seats on {s.departure_time} route ({', '.join([f'{cnt} {cls}' for cls, cnt in s.class_breakdown.items()])})" for s in services]
+                msg = f"🎉 {'; '.join(descriptions)} from {origin_name} to {dest_name} on {task.date}."
+            else:
+                msg = f"TCDD Live Check ({origin_name} ➔ {dest_name} on {task.date}): All checked routes are Sold Out. Monitoring for cancellations..."
+
+            return CheckResult(
+                task_id=task.id,
+                success=True,
+                found=found,
+                seats_count=total_seats,
+                services=services,
+                message=msg
+            )
 
         if isinstance(data, list):
             sefer_list = data
