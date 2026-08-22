@@ -43,49 +43,48 @@ def print_banner():
 def cmd_list(db: Database):
     tasks = db.list_tasks()
     if not tasks:
-        print("\nNo tracking tasks found. Create one with: notifyseat track\n")
+        print("\nNo tracking routes found. Create one with: python3 main.py track\n")
         return
 
-    if HAS_RICH:
-        table = Table(title="🚆 Active & Monitored Transport Routes", header_style="bold magenta")
-        table.add_column("ID", style="dim", width=10)
-        table.add_column("Transport", style="cyan")
-        table.add_column("Route", style="bold white")
-        table.add_column("Date", style="yellow")
-        table.add_column("Interval", style="blue")
-        table.add_column("Channels", style="green")
-        table.add_column("Status", style="bold")
-        table.add_column("Seats Found", justify="right")
-        table.add_column("Last Checked", style="dim")
+    if HAS_RICH and console:
+        console.print()
+        console.print(Panel("[bold cyan]🚆 Monitored Transport Routes[/bold cyan]", expand=True, border_style="cyan"))
+        table = Table(show_header=True, header_style="bold magenta", border_style="dim white")
+        table.add_column("ID", justify="center", style="bold cyan", width=6)
+        table.add_column("Route", justify="left", style="bold white")
+        table.add_column("Date", justify="center", style="bold yellow")
+        table.add_column("Window", justify="center", style="green")
+        table.add_column("Radar Status", justify="center")
+        table.add_column("Seats Available", justify="center")
+        table.add_column("Last Check", justify="center", style="dim")
 
         for t in tasks:
-            status_style = {
-                TaskStatus.ACTIVE: "[green]● ACTIVE[/green]",
-                TaskStatus.PAUSED: "[yellow]❚❚ PAUSED[/yellow]",
+            status_badge = {
+                TaskStatus.ACTIVE: "[bold green]🟢 ACTIVE[/bold green]",
+                TaskStatus.PAUSED: "[bold yellow]⏸ PAUSED[/bold yellow]",
                 TaskStatus.FOUND: "[bold green]✔ FOUND[/bold green]",
-                TaskStatus.ERROR: "[red]✖ ERROR[/red]"
+                TaskStatus.ERROR: "[bold red]✖ ERROR[/bold red]"
             }.get(t.status, str(t.status))
 
-            seats_display = f"[bold green]{t.last_found_seats}[/bold green]" if t.last_found_seats > 0 else "[dim]0[/dim]"
-            last_checked = t.last_checked_at.split("T")[-1][:8] if t.last_checked_at else "Never"
+            seats_display = f"[bold green]🟢 {t.last_found_seats} Seat{'s' if t.last_found_seats > 1 else ''}[/bold green]" if t.last_found_seats > 0 else "[bold red]🔴 Sold Out[/bold red]"
+            window_label = t.time_filter.title() if t.time_filter else "All Day"
+            last_checked = t.last_checked_at.split("T")[-1][:8] if t.last_checked_at else "Pending"
 
             table.add_row(
-                t.id,
-                t.transport_type.upper(),
+                str(t.id),
                 f"{t.origin} ➔ {t.destination}",
                 t.date,
-                f"{t.check_interval_seconds}s",
-                ", ".join(t.notification_channels),
-                status_style,
+                window_label,
+                status_badge,
                 seats_display,
                 last_checked
             )
         console.print(table)
-        console.print()
+        console.print("[dim]Commands: 'python3 main.py check <id>' | 'python3 main.py delete <id>' | 'python3 main.py pause <id>'[/dim]\n")
     else:
         print("\n--- Monitored Routes ---")
         for t in tasks:
-            print(f"[{t.id}] {t.transport_type.upper()}: {t.origin} -> {t.destination} ({t.date}) | Status: {t.status} | Seats: {t.last_found_seats}")
+            print(f"[{t.id}] {t.origin} -> {t.destination} ({t.date}) | Status: {t.status} | Seats: {t.last_found_seats}")
         print()
 
 
