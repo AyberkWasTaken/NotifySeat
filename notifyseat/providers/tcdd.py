@@ -343,18 +343,18 @@ class TCDDProvider(BaseProvider):
                                 for c_info in fare.get("cabinClasses", []):
                                     c_name_raw = (c_info.get("cabinClass") or {}).get("name", "")
                                     c_name_upper = c_name_raw.upper()
-                                    if "BUSİNESS" in c_name_upper or "BUSINESS" in c_name_upper:
+                                    if "SANDALYE" in c_name_upper or "ENGELLİ" in c_name_upper or "ENGELLI" in c_name_upper:
+                                        continue  # Skip disability/handicapped reserved quota
+                                    elif "BUSİNESS" in c_name_upper or "BUSINESS" in c_name_upper:
                                         c_name = "Business"
-                                    elif "EKONOMİ" in c_name_upper or "EKONOMI" in c_name_upper:
+                                    elif "EKONOMİ" in c_name_upper or "EKONOMI" in c_name_upper or "PULMAN" in c_name_upper:
                                         c_name = "Ekonomi"
                                     elif "LOCA" in c_name_upper:
                                         c_name = "Loca"
                                     elif "YATAKLI" in c_name_upper:
                                         c_name = "Yataklı"
-                                    elif "SANDALYE" in c_name_upper or "ENGELLİ" in c_name_upper:
-                                        c_name = "Engelli/Özel"
                                     else:
-                                        c_name = c_name_raw or "Standart"
+                                        c_name = c_name_raw or "Ekonomi"
 
                                     count = int(c_info.get("availabilityCount", 0) or 0)
                                     if count > 0:
@@ -367,18 +367,18 @@ class TCDDProvider(BaseProvider):
                             for c_info in train.get("cabinClassAvailabilities", []):
                                 c_name_raw = (c_info.get("cabinClass") or {}).get("name", "")
                                 c_name_upper = c_name_raw.upper()
-                                if "BUSİNESS" in c_name_upper or "BUSINESS" in c_name_upper:
+                                if "SANDALYE" in c_name_upper or "ENGELLİ" in c_name_upper or "ENGELLI" in c_name_upper:
+                                    continue  # Skip disability/handicapped reserved quota
+                                elif "BUSİNESS" in c_name_upper or "BUSINESS" in c_name_upper:
                                     c_name = "Business"
-                                elif "EKONOMİ" in c_name_upper or "EKONOMI" in c_name_upper:
+                                elif "EKONOMİ" in c_name_upper or "EKONOMI" in c_name_upper or "PULMAN" in c_name_upper:
                                     c_name = "Ekonomi"
                                 elif "LOCA" in c_name_upper:
                                     c_name = "Loca"
                                 elif "YATAKLI" in c_name_upper:
                                     c_name = "Yataklı"
-                                elif "SANDALYE" in c_name_upper or "ENGELLİ" in c_name_upper:
-                                    c_name = "Engelli/Özel"
                                 else:
-                                    c_name = c_name_raw or "Standart"
+                                    c_name = c_name_raw or "Ekonomi"
 
                                 count = int(c_info.get("availabilityCount", 0) or 0)
                                 if count > 0:

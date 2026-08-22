@@ -53,17 +53,38 @@ class TaskWorker:
         prev_seats = task.last_found_seats
         new_seats = result.seats_count
 
-        # State transition: 0 -> >0 or significant seat change
-        if result.found and (prev_seats == 0 or new_seats != prev_seats):
-            title = f"Seat Available: {task.origin} ➔ {task.destination}"
-            body = result.message
+        # State transition: Only notify when a sold-out route gets seats (0 -> >0)
+        # or when new cancellation seats open up (new_seats > prev_seats).
+        # Never send repeated alerts if seats stay the same.
+        should_notify = result.found and (prev_seats == 0 or new_seats > prev_seats)
+
+        if should_notify:
+            open_services = [s for s in result.services if s.total_available_seats > 0]
+            first_s = open_services[0] if open_services else (result.services[0] if result.services else None)
             
-            first_service = result.services[0] if result.services else None
+            if open_services:
+                summary_lines = []
+                for s in open_services:
+                    cls_str = ", ".join([f"{cnt} {cls}" for cls, cnt in s.class_breakdown.items() if cnt > 0])
+                    summary_lines.append(f"• {s.departure_time} ({s.service_name}): {s.total_available_seats} seat(s) [{cls_str}]")
+                details_text = "\n".join(summary_lines)
+            else:
+                details_text = f"{new_seats} seat(s) available."
+
+            title = f"🎉 Seat Opening: {task.origin} ➔ {task.destination}"
+            body = (
+                f"🚨 CANCELLATION DETECTED!\n"
+                f"🚆 Route: {task.origin} ➔ {task.destination}\n"
+                f"📅 Date: {task.date}\n\n"
+                f"💺 Available Seats:\n{details_text}\n\n"
+                f"🔗 Book Immediately: https://ebilet.tcddtasimacilik.gov.tr"
+            )
+
             notification_data = {
                 "seats_count": new_seats,
-                "service_name": first_service.service_name if first_service else "Direct Service",
-                "departure_time": first_service.departure_time if first_service else "",
-                "booking_url": first_service.booking_url if first_service else "https://ebilet.tcddtasimacilik.gov.tr",
+                "service_name": first_s.service_name if first_s else "Direct Service",
+                "departure_time": first_s.departure_time if first_s else "",
+                "booking_url": "https://ebilet.tcddtasimacilik.gov.tr",
                 "services": services_dict_list
             }
 
@@ -91,7 +112,7 @@ class TaskWorker:
                 "result": result,
                 "name": task.name,
                 "seats": new_seats,
-                "message": result.message,
+                "message": body,
                 "services": services_dict_list,
                 "service_info": last_service_data
             })
