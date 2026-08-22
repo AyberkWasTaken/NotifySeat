@@ -267,20 +267,26 @@ def cmd_test_notify(config_mgr: ConfigManager, channel: Optional[str] = None):
     mgr = NotificationManager(cfg)
     
     if channel:
-        print(f"Testing notification channel: '{channel}'...")
+        print(f"\nTesting notification channel: '{channel}'...")
         success = mgr.test_channel(channel)
         if success:
-            print(f"\033[1;32m✔ Test notification for '{channel}' was SUCCESSFUL!\033[0m")
+            print(f"\033[1;32m✔ [{channel.upper()}] Test notification was SUCCESSFUL!\033[0m\n")
         else:
-            print(f"\033[1;31m✖ Test notification for '{channel}' failed. Please check configuration settings.\033[0m")
+            print(f"\033[1;31m✖ [{channel.upper()}] Test notification failed. Check credentials with 'python3 main.py config'.\033[0m\n")
     else:
-        print("\n\033[1;36mTesting all active notification channels...\033[0m\n")
+        print("\n\033[1;36m==================================================\033[0m")
+        print("\033[1;36m        ⚡ Testing Notification Channels          \033[0m")
+        print("\033[1;36m==================================================\033[0m\n")
         results = mgr.test_all()
-        for ch, ok in results.items():
-            if ok:
-                print(f"  \033[1;32m✔ [{ch.upper()}] Test alert SUCCESSFUL!\033[0m")
+        for ch, data in results.items():
+            label = data["label"]
+            if data["enabled"]:
+                if data["success"]:
+                    print(f"  \033[1;32m✔ [{ch.upper()}]\033[0m {label}: \033[1;32mSUCCESSFUL (Delivered!)\033[0m")
+                else:
+                    print(f"  \033[1;31m✖ [{ch.upper()}]\033[0m {label}: \033[1;31mFAILED (Check credentials via 'python3 main.py config')\033[0m")
             else:
-                print(f"  \033[1;31m✖ [{ch.upper()}] Test alert FAILED. Check credentials with 'python3 main.py config'.\033[0m")
+                print(f"  \033[1;30m⚪ [{ch.upper()}]\033[0m {label}: \033[2mDisabled (Run 'python3 main.py config' to enable)\033[0m")
         print()
 
 

@@ -111,13 +111,32 @@ class NotificationManager:
             return False
         return notifier.test()
 
-    def test_all(self) -> Dict[str, bool]:
-        """Test all active/configured channels."""
+    def test_all(self) -> Dict[str, Dict[str, Any]]:
+        """Test all channels and return structured status."""
         results = {}
-        if self.config.desktop.enabled and "desktop" in self.notifiers:
-            results["desktop"] = self.notifiers["desktop"].test()
-        if self.config.email.enabled and "email" in self.notifiers:
-            results["email"] = self.notifiers["email"].test()
-        if self.config.whatsapp.enabled and "whatsapp" in self.notifiers:
-            results["whatsapp"] = self.notifiers["whatsapp"].test()
+        
+        # Desktop
+        desktop_notifier = self.notifiers.get("desktop")
+        if self.config.desktop.enabled and desktop_notifier:
+            ok = desktop_notifier.test()
+            results["desktop"] = {"enabled": True, "success": ok, "label": "Desktop Audio & Notification"}
+        else:
+            results["desktop"] = {"enabled": False, "success": False, "label": "Desktop Audio & Notification"}
+
+        # WhatsApp
+        wa_notifier = self.notifiers.get("whatsapp")
+        if self.config.whatsapp.enabled and self.config.whatsapp.phone_number and wa_notifier:
+            ok = wa_notifier.test()
+            results["whatsapp"] = {"enabled": True, "success": ok, "label": f"WhatsApp ({self.config.whatsapp.phone_number})"}
+        else:
+            results["whatsapp"] = {"enabled": False, "success": False, "label": "WhatsApp (Direct Mobile Alert)"}
+
+        # Email
+        email_notifier = self.notifiers.get("email")
+        if self.config.email.enabled and self.config.email.recipient_email and email_notifier:
+            ok = email_notifier.test()
+            results["email"] = {"enabled": True, "success": ok, "label": f"Email ({self.config.email.recipient_email})"}
+        else:
+            results["email"] = {"enabled": False, "success": False, "label": "Email (SMTP)"}
+
         return results
