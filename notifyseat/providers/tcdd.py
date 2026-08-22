@@ -203,6 +203,17 @@ class TCDDProvider(BaseProvider):
     ) -> Optional[CheckResult]:
         """Calls modern YTP API with bearer authentication and NetScaler session cookies."""
         cookies_dict = self._get_netscaler_cookies()
+        session_file = Path.home() / ".notifyseat" / "tcdd_session.json"
+        saved_session = {}
+        if session_file.exists():
+            try:
+                with open(session_file, "r", encoding="utf-8") as f:
+                    saved_session = json.load(f)
+                    if saved_session.get("cookies"):
+                        cookies_dict.update(saved_session["cookies"])
+            except Exception:
+                pass
+
         cookie_header = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()]) if cookies_dict else ""
 
         headers = {
@@ -214,6 +225,8 @@ class TCDDProvider(BaseProvider):
             "channelId": "3",
             "Accept": "application/json, text/plain, */*"
         }
+        if saved_session.get("headers"):
+            headers.update(saved_session["headers"])
         if cookie_header:
             headers["Cookie"] = cookie_header
 

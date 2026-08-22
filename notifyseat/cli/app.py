@@ -244,7 +244,12 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
     print("\n🌐 Launching interactive browser to connect TCDD live session...")
     print("👉 Please search for any route on the page. NotifySeat will capture your active session automatically.\n")
     try:
+        import json
+        from pathlib import Path
         from playwright.sync_api import sync_playwright
+
+        session_file = Path.home() / ".notifyseat" / "tcdd_session.json"
+
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=False,
@@ -257,21 +262,40 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
             page = context.new_page()
 
             captured = []
+
             def on_req(req):
+                url = req.url.lower()
                 auth = req.headers.get("authorization", "")
-                if auth and "Bearer" in auth and ("train-availability" in req.url or "tms" in req.url or "train" in req.url):
-                    token = auth.replace("Bearer", "").strip()
-                    if len(token) > 50 and token not in captured:
-                        captured.append(token)
+                if ("train" in url or "sefer" in url or "availability" in url or "tms" in url or "station" in url) and not (url.endswith(".js") or url.endswith(".css")):
+                    token = auth.replace("Bearer", "").strip() if "Bearer" in auth else ""
+                    headers_dict = dict(req.headers)
+                    cookies_list = context.cookies()
+                    cookies_dict = {c["name"]: c["value"] for c in cookies_list}
+
+                    session_data = {
+                        "timestamp": time.time(),
+                        "url": req.url,
+                        "token": token,
+                        "headers": headers_dict,
+                        "cookies": cookies_dict
+                    }
+                    session_file.parent.mkdir(parents=True, exist_ok=True)
+                    with open(session_file, "w", encoding="utf-8") as f:
+                        json.dump(session_data, f, indent=2)
+
+                    if token:
                         cfg = config_mgr.get()
                         cfg.tcdd_token = token
                         config_mgr.save(cfg)
-                        print(f"\n🎉 Successfully captured active TCDD Bearer token!")
+
+                    if not captured:
+                        captured.append(req.url)
+                        print(f"\n🎉 Successfully captured live TCDD session from: {req.url}")
 
             page.on("request", on_req)
             page.goto("https://ebilet.tcddtasimacilik.gov.tr")
 
-            for _ in range(120):
+            for _ in range(180):
                 if captured:
                     time.sleep(2)
                     break
@@ -286,7 +310,7 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
             if captured:
                 print("✔ Active TCDD session connected and saved to config!")
             else:
-                print("⚠️ No active token was intercepted. You can also paste it with 'python3 main.py set-token <token>'.")
+                print("⚠️ No session was intercepted. You can also paste your token with 'python3 main.py set-token <token>'.")
     except Exception as e:
         print(f"Browser connection error: {e}")
 
