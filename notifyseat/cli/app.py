@@ -111,29 +111,37 @@ def cmd_track(db: Database, args: argparse.Namespace):
         print(f"✔ Created tracking task [{task.id}]: {task.name}")
 
 
-def cmd_check_now(db: Database, config_mgr: ConfigManager, task_id: str):
-    task = db.get_task(task_id)
-    if not task:
-        print(f"✖ Task [{task_id}] not found in database.")
-        return
+def cmd_check_now(db: Database, config_mgr: ConfigManager, task_id: Optional[str] = None):
+    if task_id:
+        tasks = [db.get_task(task_id)]
+        if not tasks[0]:
+            print(f"✖ Task [{task_id}] not found in database.")
+            return
+    else:
+        tasks = db.list_tasks(status=TaskStatus.ACTIVE) or db.list_tasks()
+        if not tasks:
+            print("✖ No tasks found in database. Create one with: python3 main.py track")
+            return
 
-    print(f"⚡ Checking route [{task.name}] on {task.date}...")
     cfg = config_mgr.get()
     notifier_mgr = NotificationManager(cfg, db)
     scheduler = EngineScheduler(db, cfg, notifier_mgr)
-    result = scheduler.worker.execute_task(task)
 
-    if result.found:
-        print(f"\n\033[1;32m{result.message}\033[0m\n")
-        if result.services:
-            for s in result.services:
-                class_desc = ", ".join([f"{count} {cls}" for cls, count in s.class_breakdown.items() if count > 0])
-                print(f"  • {s.departure_time} - {s.service_name}: {s.total_available_seats} seats ({class_desc})")
-                if s.booking_url:
-                    print(f"    Booking link: {s.booking_url}")
-            print()
-    else:
-        print(f"\n\033[1;33m{result.message}\033[0m\n")
+    for task in tasks:
+        print(f"\n⚡ Checking route [{task.name}] on {task.date}...")
+        result = scheduler.worker.execute_task(task)
+
+        if result.found:
+            print(f"\n\033[1;32m{result.message}\033[0m\n")
+            if result.services:
+                for s in result.services:
+                    class_desc = ", ".join([f"{count} {cls}" for cls, count in s.class_breakdown.items() if count > 0])
+                    print(f"  • {s.departure_time} - {s.service_name}: {s.total_available_seats} seats ({class_desc})")
+                    if s.booking_url:
+                        print(f"    Booking link: {s.booking_url}")
+                print()
+        else:
+            print(f"\n\033[1;33m{result.message}\033[0m\n")
 
 
 def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
@@ -361,8 +369,8 @@ def main():
     track_p.add_argument("--channels", default="desktop", help="Comma-separated channels: desktop,telegram,discord,email,sms,webhook")
 
     # check
-    chk_p = subparsers.add_parser("check", help="Trigger an immediate live check for a task")
-    chk_p.add_argument("task_id", help="Task ID to check immediately")
+    chk_p = subparsers.add_parser("check", help="Trigger an immediate live check for a task (or all active tasks)")
+    chk_p.add_argument("task_id", nargs="?", default=None, help="Task ID to check (optional, checks all active if omitted)")
 
     # run
     subparsers.add_parser("run", help="Start monitoring engine in foreground")
