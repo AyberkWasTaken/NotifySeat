@@ -265,8 +265,15 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
 
             def on_req(req):
                 url = req.url.lower()
+                method = req.method
                 auth = req.headers.get("authorization", "")
-                if ("train-availability" in url or "load-trains" in url or "sefer" in url or "availability" in url) and not ("station" in url or url.endswith(".json") or url.endswith(".js") or url.endswith(".css")):
+
+                # Log API requests live in terminal
+                if not (url.endswith(".js") or url.endswith(".css") or url.endswith(".png") or url.endswith(".svg") or url.endswith(".woff2") or "google" in url):
+                    print(f"📡 [{method}] {req.url[:70]}...")
+
+                if (method == "POST" and "tcddtasimacilik.gov.tr" in url and not url.endswith(".js")) or \
+                   ("train-availability" in url or "load-trains" in url or "sefer" in url or "sefer-listesi" in url):
                     token = auth.replace("Bearer", "").strip() if "Bearer" in auth else ""
                     headers_dict = dict(req.headers)
                     cookies_list = context.cookies()
@@ -290,9 +297,9 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
 
                     if not captured:
                         captured.append(req.url)
-                        print(f"\n🎉 Successfully captured live TCDD search session from: {req.url}")
+                        print(f"\n🎉 Successfully captured live TCDD session from: {req.url}")
                         if token:
-                            print(f"🔑 Live Token: {token[:25]}... (Length {len(token)})")
+                            print(f"🔑 Live Token captured (Length: {len(token)})")
 
             page.on("request", on_req)
 
@@ -308,15 +315,24 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
                 try:
                     if page.is_closed():
                         break
+                    # If page navigated to search results
+                    if "sefer-listesi" in page.url or "bilet" in page.url:
+                        cookies_list = context.cookies()
+                        cookies_dict = {c["name"]: c["value"] for c in cookies_list}
+                        with open(session_file, "w", encoding="utf-8") as f:
+                            json.dump({"timestamp": time.time(), "cookies": cookies_dict}, f, indent=2)
+                        captured.append(page.url)
+                        print(f"\n🎉 Successfully captured session on results page: {page.url}")
+                        break
                 except Exception:
                     break
                 time.sleep(1)
 
             browser.close()
             if captured:
-                print("✔ Active TCDD session connected and saved to config!")
+                print("✔ Active TCDD session connected and saved!")
             else:
-                print("⚠️ No search session was intercepted. You can also paste your token with 'python3 main.py set-token <token>'.")
+                print("⚠️ No session was intercepted. You can also paste your token with 'python3 main.py set-token <token>'.")
     except Exception as e:
         print(f"Browser connection error: {e}")
 
