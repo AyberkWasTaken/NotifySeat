@@ -327,50 +327,64 @@ class TCDDProvider(BaseProvider):
                         if task.time_filter and not self._match_time_filter(dep_time, task.time_filter):
                             continue
 
+                        # Check if train is sold out via minPrice
+                        min_price_obj = train.get("minPrice") or {}
+                        price_amount = float(min_price_obj.get("priceAmount", 0.0) or 0.0)
+                        price_currency = min_price_obj.get("priceCurrency")
+                        is_train_sold_out = (price_amount <= 0 or price_currency is None)
+
                         # Extract seats from bookingClassCapacities / wagons
                         class_breakdown = {}
                         train_seats = 0
-                        capacities = train.get("bookingClassCapacities", []) or train.get("wagons", [])
-                        for cap in capacities:
-                            cls_id = cap.get("bookingClassId") or cap.get("id")
-                            cls_name = cap.get("name") or cap.get("bookingClassName")
-                            if not cls_name:
-                                if cls_id == 1:
-                                    cls_name = "Pulman"
-                                elif cls_id in (2, 4):
-                                    cls_name = "Business"
-                                elif cls_id == 7:
-                                    cls_name = "Yataklı"
-                                elif cls_id == 23:
-                                    cls_name = "Engelli"
-                                elif cls_id == 22:
-                                    cls_name = "Loca"
-                                else:
-                                    cls_name = f"Sınıf {cls_id}"
-                            
-                            seats = int(cap.get("availableSeats") or cap.get("capacity") or cap.get("seatCount") or 0)
-                            if task.seat_class and task.seat_class != "ANY":
-                                if task.seat_class.lower() not in cls_name.lower():
-                                    continue
-                            class_breakdown[cls_name] = seats
-                            train_seats += seats
 
-                        if train_seats > 0:
-                            services.append(ServiceInfo(
-                                service_id=train_num,
-                                service_name=f"{train_num} - {train_name}",
-                                departure_time=dep_time,
-                                arrival_time=arr_time,
-                                origin=origin_name,
-                                destination=dest_name,
-                                date=task.date,
-                                total_available_seats=train_seats,
-                                class_breakdown=class_breakdown,
-                                booking_url=self.BOOKING_URL,
-                                operator="TCDD Taşımacılık",
-                                notes=f"Found {train_seats} empty seats on {dep_time} route from {origin_name} to {dest_name}"
-                            ))
-                            total_seats += train_seats
+                        if not is_train_sold_out:
+                            capacities = train.get("bookingClassCapacities", []) or train.get("wagons", [])
+                            for cap in capacities:
+                                cls_id = cap.get("bookingClassId") or cap.get("id")
+                                cls_name = cap.get("name") or cap.get("bookingClassName")
+                                if not cls_name:
+                                    if cls_id == 1:
+                                        cls_name = "Pulman"
+                                    elif cls_id in (2, 4):
+                                        cls_name = "Business"
+                                    elif cls_id == 7:
+                                        cls_name = "Yataklı"
+                                    elif cls_id == 23:
+                                        cls_name = "Engelli"
+                                    elif cls_id == 22:
+                                        cls_name = "Loca"
+                                    else:
+                                        cls_name = f"Sınıf {cls_id}"
+                                
+                                # If exact available seats given per coach, use it; otherwise at least 1 ticket is available
+                                seats = int(cap.get("availableSeats") or cap.get("seatCount") or 0)
+                                if seats == 0 and not is_train_sold_out:
+                                    seats = 1  # Seats open for booking in this class
+
+                                if task.seat_class and task.seat_class != "ANY":
+                                    if task.seat_class.lower() not in cls_name.lower():
+                                        continue
+                                class_breakdown[cls_name] = seats
+                                train_seats += seats
+
+                            if train_seats > 0:
+                                services.append(ServiceInfo(
+                                    service_id=train_num,
+                                    service_name=f"{train_num} - {train_name}",
+                                    departure_time=dep_time,
+                                    arrival_time=arr_time,
+                                    origin=origin_name,
+                                    destination=dest_name,
+                                    date=task.date,
+                                    total_available_seats=train_seats,
+                                    class_breakdown=class_breakdown,
+                                    price=price_amount,
+                                    currency=price_currency or "TRY",
+                                    booking_url=self.BOOKING_URL,
+                                    operator="TCDD Taşımacılık",
+                                    notes=f"Tickets available from {price_amount} {price_currency} on {dep_time} route ({origin_name} ➔ {dest_name})"
+                                ))
+                                total_seats += train_seats
 
             found = total_seats >= task.min_seats
             if found:
