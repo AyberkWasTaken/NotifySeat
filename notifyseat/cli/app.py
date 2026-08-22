@@ -129,6 +129,7 @@ def render_track_check_table(task: TrackingTask, result):
             table.add_column("Status", justify="center")
             table.add_column("Business", justify="center")
             table.add_column("Ekonomi", justify="center")
+            table.add_column("Diğer / Özel", justify="center")
             table.add_column("Min Price", justify="center", style="bold green")
 
             for s in result.services:
@@ -144,19 +145,22 @@ def render_track_check_table(task: TrackingTask, result):
 
                 bus_cnt = bd.get("Business", 0)
                 eko_cnt = bd.get("Ekonomi", 0)
+                diger_cnt = sum(cnt for cls_k, cnt in bd.items() if cls_k not in ("Business", "Ekonomi"))
 
                 if seats > 0:
                     status_cell = f"[bold green]🟢 {seats} Seat{'s' if seats > 1 else ''}[/bold green]"
                     bus_cell = f"[green]{bus_cnt}[/green]" if bus_cnt > 0 else "[dim]0[/dim]"
                     eko_cell = f"[bold green]{eko_cnt}[/bold green]" if eko_cnt > 0 else "[dim]0[/dim]"
+                    diger_cell = f"[cyan]{diger_cnt}[/cyan]" if diger_cnt > 0 else "[dim]0[/dim]"
                     price_cell = f"{price:.0f} {curr}" if price else "-"
                 else:
                     status_cell = "[bold red]🔴 Sold Out[/bold red]"
                     bus_cell = "[dim red]0[/dim red]"
                     eko_cell = "[dim red]0[/dim red]"
+                    diger_cell = "[dim red]0[/dim red]"
                     price_cell = "[dim]-[/dim]"
 
-                table.add_row(dep_str, train_no, status_cell, bus_cell, eko_cell, price_cell)
+                table.add_row(dep_str, train_no, status_cell, bus_cell, eko_cell, diger_cell, price_cell)
 
             console.print(table)
             if result.found:
@@ -191,6 +195,16 @@ def cmd_check_now(db: Database, config_mgr: ConfigManager, task_id: Optional[str
 
     for task in tasks:
         result = scheduler.worker.execute_task(task)
+        now_str = datetime.now().isoformat()
+        last_service = result.services[0].to_dict() if result.services else None
+        db.update_task_check_state(
+            task_id=task.id,
+            last_checked=now_str,
+            found_seats=result.seats_count,
+            service_info=last_service
+        )
+        task.last_checked_at = now_str
+        task.last_found_seats = result.seats_count
         render_track_check_table(task, result)
 
 

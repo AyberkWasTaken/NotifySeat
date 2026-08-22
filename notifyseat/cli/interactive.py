@@ -44,26 +44,6 @@ class StationTabCompleter:
             return None
 
 
-def prompt_autocomplete(prompt: str, candidates: List[str]) -> str:
-    completer = StationTabCompleter(candidates)
-    
-    C_CYAN = "\001\033[1;36m\002"
-    C_RESET = "\001\033[0m\002"
-    prompt_str = f"{C_CYAN}? {prompt}:{C_RESET} "
-
-    try:
-        readline.set_completer(completer.complete)
-        readline.set_completer_delims(" \t\n`~!@#$%^&*()=+[{]}\\|;:'\",<>?")
-        readline.parse_and_bind("tab: complete")
-        readline.parse_and_bind("set completion-ignore-case on")
-        val = input(prompt_str).strip()
-        return val
-    except (EOFError, KeyboardInterrupt):
-        raise KeyboardInterrupt
-    finally:
-        readline.set_completer(None)
-
-
 def prompt_choice(prompt: str, choices: List[str], default_idx: int = 0) -> int:
     print(f"\n\033[1;36m? {prompt}\033[0m")
     for i, choice in enumerate(choices):
@@ -112,22 +92,11 @@ def interactive_create_task() -> Optional[TrackingTask]:
     print("  • \033[1;37mAdana, Kayseri, Kars, Kırıkkale, Denizli, Diyarbakır, Gaziantep\033[0m\n")
 
     provider = registry.get(TransportType.TCDD)
-    
-    # Comprehensive candidate station names
-    station_candidates = [s["name"] for s in TCDD_STATIONS]
-    for s in TCDD_STATIONS:
-        for a in s.get("aliases", []):
-            if len(a) > 3 and a.title() not in station_candidates:
-                station_candidates.append(a.title())
 
-    raw_origin = prompt_autocomplete("Enter Departure Station", candidates=station_candidates)
-    if not raw_origin:
-        raw_origin = "İstanbul(Söğütlüçeşme)"
-    raw_dest = prompt_autocomplete("Enter Arrival Station", candidates=station_candidates)
-    if not raw_dest:
-        raw_dest = "Ankara Gar"
+    raw_origin = prompt_text("Enter Departure Station", default="İstanbul(Söğütlüçeşme)")
+    raw_dest = prompt_text("Enter Arrival Station", default="Ankara Gar")
 
-    # Intelligent fuzzy matching (e.g. 'ankaragar' -> 'Ankara Gar', 'sogutlucesme' -> 'İstanbul(Söğütlüçeşme)')
+    # Intelligent fuzzy matching (e.g. 'ankaragar' -> 'Ankara Gar', 'sogutlucesme' -> 'İstanbul(Söğütlüçeşme)', 'basmane' -> 'İzmir (Basmane)')
     res_orig = provider.get_station_by_name(raw_origin)
     res_dest = provider.get_station_by_name(raw_dest)
     origin = res_orig["name"] if res_orig else raw_origin
