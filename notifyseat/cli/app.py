@@ -111,6 +111,73 @@ def cmd_track(db: Database, args: argparse.Namespace):
         print(f"✔ Created tracking task [{task.id}]: {task.name}")
 
 
+def render_track_check_table(task: TrackingTask, result):
+    window_label = task.time_filter.title() if task.time_filter else "All Day"
+    title_text = (
+        f"[bold cyan]🚆 Route:[/bold cyan] [bold white]{task.origin} ➔ {task.destination}[/bold white]   "
+        f"[bold cyan]📅 Date:[/bold cyan] [bold yellow]{task.date}[/bold yellow]   "
+        f"[bold cyan]🕒 Window:[/bold cyan] [bold green]{window_label}[/bold green]   "
+        f"[bold cyan]🆔 ID:[/bold cyan] [dim]{task.id}[/dim]"
+    )
+    if HAS_RICH and console:
+        console.print()
+        console.print(Panel(title_text, expand=True, border_style="cyan"))
+
+        if result.services:
+            table = Table(show_header=True, header_style="bold magenta", border_style="dim white", expand=True)
+            table.add_column("Departure", justify="center", style="bold yellow", width=14)
+            table.add_column("Train & Service", justify="left", style="white", min_width=25)
+            table.add_column("Status", justify="center", width=14)
+            table.add_column("Business", justify="center", width=10)
+            table.add_column("Ekonomi", justify="center", width=10)
+            table.add_column("Özel / Engelli", justify="center", width=15)
+            table.add_column("Min Price", justify="center", style="bold green", width=12)
+
+            for s in result.services:
+                dep = s.departure_time or "??"
+                arr = s.arrival_time or ""
+                dep_str = f"{dep} ➔ {arr}" if arr else dep
+                name = s.service_name
+                seats = s.total_available_seats
+                bd = s.class_breakdown
+                price = s.price
+                curr = s.currency or "TRY"
+
+                bus_cnt = bd.get("Business", 0)
+                eko_cnt = bd.get("Ekonomi", 0)
+                ozel_cnt = bd.get("Engelli/Özel", bd.get("Loca", bd.get("Yataklı", 0)))
+
+                if seats > 0:
+                    status_cell = f"[bold green]🟢 {seats} Seat{'s' if seats > 1 else ''}[/bold green]"
+                    bus_cell = f"[green]{bus_cnt}[/green]" if bus_cnt > 0 else "[dim]0[/dim]"
+                    eko_cell = f"[bold green]{eko_cnt}[/bold green]" if eko_cnt > 0 else "[dim]0[/dim]"
+                    ozel_cell = f"[green]{ozel_cnt}[/green]" if ozel_cnt > 0 else "[dim]0[/dim]"
+                    price_cell = f"{price:.0f} {curr}" if price else "-"
+                else:
+                    status_cell = "[bold red]🔴 Sold Out[/bold red]"
+                    bus_cell = "[dim red]0[/dim red]"
+                    eko_cell = "[dim red]0[/dim red]"
+                    ozel_cell = "[dim red]0[/dim red]"
+                    price_cell = "[dim]-[/dim]"
+
+                table.add_row(dep_str, name, status_cell, bus_cell, eko_cell, ozel_cell, price_cell)
+
+            console.print(table)
+            if result.found:
+                console.print(f"[bold green]✔ {result.message}[/bold green]")
+            else:
+                console.print(f"[yellow]{result.message}[/yellow]")
+            console.print()
+        else:
+            if result.found:
+                console.print(f"[bold green]{result.message}[/bold green]\n")
+            else:
+                console.print(f"[yellow]{result.message}[/yellow]\n")
+    else:
+        print(f"\n--- [{task.origin} -> {task.destination} ({task.date})] ---")
+        print(result.message)
+
+
 def cmd_check_now(db: Database, config_mgr: ConfigManager, task_id: Optional[str] = None):
     if task_id:
         tasks = [db.get_task(task_id)]
@@ -128,20 +195,8 @@ def cmd_check_now(db: Database, config_mgr: ConfigManager, task_id: Optional[str
     scheduler = EngineScheduler(db, cfg, notifier_mgr)
 
     for task in tasks:
-        print(f"\n⚡ Checking route [{task.name}] on {task.date}...")
         result = scheduler.worker.execute_task(task)
-
-        if result.found:
-            print(f"\n\033[1;32m{result.message}\033[0m\n")
-            if result.services:
-                for s in result.services:
-                    class_desc = ", ".join([f"{count} {cls}" for cls, count in s.class_breakdown.items() if count > 0])
-                    print(f"  • {s.departure_time} - {s.service_name}: {s.total_available_seats} seats ({class_desc})")
-                    if s.booking_url:
-                        print(f"    Booking link: {s.booking_url}")
-                print()
-        else:
-            print(f"\n\033[1;33m{result.message}\033[0m\n")
+        render_track_check_table(task, result)
 
 
 def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):

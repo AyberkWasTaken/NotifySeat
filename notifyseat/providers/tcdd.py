@@ -388,28 +388,28 @@ class TCDDProvider(BaseProvider):
                                     class_breakdown[c_name] = class_breakdown.get(c_name, 0) + count
                                     train_seats += count
 
-                        if train_seats > 0:
-                            services.append(ServiceInfo(
-                                service_id=train_num,
-                                service_name=f"{train_num} - {train_name}",
-                                departure_time=dep_time,
-                                arrival_time=arr_time,
-                                origin=origin_name,
-                                destination=dest_name,
-                                date=task.date,
-                                total_available_seats=train_seats,
-                                class_breakdown=class_breakdown,
-                                price=price_amount,
-                                currency=price_currency or "TRY",
-                                booking_url=self.BOOKING_URL,
-                                operator="TCDD Taşımacılık",
-                                notes=f"Available seats on {dep_time} route from {origin_name} to {dest_name}"
-                            ))
-                            total_seats += train_seats
+                        services.append(ServiceInfo(
+                            service_id=train_num,
+                            service_name=f"{train_num} - {train_name}",
+                            departure_time=dep_time,
+                            arrival_time=arr_time,
+                            origin=origin_name,
+                            destination=dest_name,
+                            date=task.date,
+                            total_available_seats=train_seats,
+                            class_breakdown=class_breakdown,
+                            price=price_amount if price_amount > 0 else None,
+                            currency=price_currency if price_amount > 0 else "TRY",
+                            booking_url=self.BOOKING_URL,
+                            operator="TCDD Taşımacılık",
+                            notes=f"Available seats on {dep_time} route" if train_seats > 0 else "Sold Out"
+                        ))
+                        total_seats += train_seats
 
             found = total_seats >= task.min_seats
-            if found:
-                descriptions = [f"found {s.total_available_seats} empty seats on {s.departure_time} route ({', '.join([f'{cnt} {cls}' for cls, cnt in s.class_breakdown.items()])})" for s in services]
+            open_services = [s for s in services if s.total_available_seats > 0]
+            if found and open_services:
+                descriptions = [f"found {s.total_available_seats} empty seats on {s.departure_time} route ({', '.join([f'{cnt} {cls}' for cls, cnt in s.class_breakdown.items() if cnt > 0])})" for s in open_services]
                 msg = f"🎉 {'; '.join(descriptions)} from {origin_name} to {dest_name} on {task.date}."
             else:
                 msg = f"TCDD Live Check ({origin_name} ➔ {dest_name} on {task.date}): All checked routes are Sold Out. Monitoring for cancellations..."

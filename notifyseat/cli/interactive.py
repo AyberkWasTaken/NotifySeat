@@ -89,12 +89,8 @@ def interactive_create_task() -> Optional[TrackingTask]:
     elif tm_idx == 4:
         time_filter = prompt_text("Enter specific departure hour (HH:MM):", default="08:30")
 
-    # 4. Check Interval
-    interval_str = prompt_text("Check frequency in seconds (recommended 15-60):", default="30")
-    try:
-        interval_sec = max(5, int(interval_str))
-    except ValueError:
-        interval_sec = 30
+    # 4. Check Interval (Fixed to 1 minute / 60 seconds)
+    interval_sec = 60
 
     # 5. Notification Channels
     print("\n\033[1;36mSelect Notification Channels (Desktop is enabled by default):\033[0m")
