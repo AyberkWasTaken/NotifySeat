@@ -242,13 +242,15 @@ def cmd_test_notify(config_mgr: ConfigManager, channel: str):
 
 def cmd_connect_tcdd(config_mgr: ConfigManager):
     print("\n🌐 Launching interactive browser to connect TCDD live session...")
-    print("👉 Please search for any route on the page. NotifySeat will capture your active session automatically.\n")
+    print("👉 Please search for your desired route (e.g. İstanbul to Eskişehir).")
+    print("👉 When search results appear, NotifySeat will capture the live session and print all available seats!\n")
     try:
         import json
         from pathlib import Path
         from playwright.sync_api import sync_playwright
 
         session_file = Path.home() / ".notifyseat" / "tcdd_session.json"
+        db = Database()
 
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -268,12 +270,8 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
                 method = req.method
                 auth = req.headers.get("authorization", "")
 
-                # Log API requests live in terminal
-                if not (url.endswith(".js") or url.endswith(".css") or url.endswith(".png") or url.endswith(".svg") or url.endswith(".woff2") or "google" in url):
-                    print(f"📡 [{method}] {req.url[:70]}...")
-
-                if (method == "POST" and "tcddtasimacilik.gov.tr" in url and not url.endswith(".js")) or \
-                   ("train-availability" in url or "load-trains" in url or "sefer" in url or "sefer-listesi" in url):
+                # Only trigger on actual train availability / search requests
+                if method == "POST" and ("train-availability" in url or "load-trains" in url):
                     token = auth.replace("Bearer", "").strip() if "Bearer" in auth else ""
                     headers_dict = dict(req.headers)
                     cookies_list = context.cookies()
@@ -297,7 +295,7 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
 
                     if not captured:
                         captured.append(req.url)
-                        print(f"\n🎉 Successfully captured live TCDD session from: {req.url}")
+                        print(f"\n🎉 Successfully captured live TCDD session from search request!")
                         if token:
                             print(f"🔑 Live Token captured (Length: {len(token)})")
 
@@ -308,15 +306,15 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
             except Exception as e:
                 logger.debug(f"Navigation warning: {e}")
 
-            for _ in range(180):
+            for _ in range(300):
                 if captured:
                     time.sleep(2)
                     break
                 try:
                     if page.is_closed():
                         break
-                    # If page navigated to search results
-                    if "sefer-listesi" in page.url or "bilet" in page.url:
+                    # If page navigated to search results (/sefer-listesi)
+                    if "sefer-listesi" in page.url:
                         cookies_list = context.cookies()
                         cookies_dict = {c["name"]: c["value"] for c in cookies_list}
                         with open(session_file, "w", encoding="utf-8") as f:
@@ -330,9 +328,17 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
 
             browser.close()
             if captured:
-                print("✔ Active TCDD session connected and saved!")
+                print("✔ Active TCDD session connected and saved!\n")
+                print("⚡ Triggering immediate live route check with new session...\n")
+                tasks = db.list_tasks()
+                active_tcdd_tasks = [t for t in tasks if t.transport_type == "tcdd" and t.status == TaskStatus.ACTIVE]
+                if active_tcdd_tasks:
+                    for t in active_tcdd_tasks:
+                        cmd_check_now(db, config_mgr, t.id)
+                else:
+                    print("No active TCDD tasks to check. Create one with: python3 main.py track")
             else:
-                print("⚠️ No session was intercepted. You can also paste your token with 'python3 main.py set-token <token>'.")
+                print("⚠️ No search action was detected. You can run 'python3 main.py connect-tcdd' again or set token with 'set-token'.")
     except Exception as e:
         print(f"Browser connection error: {e}")
 
