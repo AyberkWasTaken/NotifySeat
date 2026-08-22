@@ -1,8 +1,45 @@
 """Interactive Terminal Wizard for NotifySeat."""
 from datetime import datetime, timedelta
 from typing import Optional, List
+import readline
 from notifyseat.core.models import TrackingTask, TransportType, TaskStatus
 from notifyseat.providers.registry import registry
+from notifyseat.providers.tcdd import TCDD_STATIONS, normalize_tr
+
+
+class StationTabCompleter:
+    """Provides real-time TAB autocompletion for train stations and cities."""
+    def __init__(self, candidates: List[str]):
+        self.candidates = candidates
+        self.matches = []
+
+    def complete(self, text: str, state: int):
+        if state == 0:
+            if text:
+                t_norm = normalize_tr(text)
+                self.matches = [c for c in self.candidates if t_norm in normalize_tr(c)]
+            else:
+                self.matches = self.candidates[:]
+        try:
+            return self.matches[state]
+        except IndexError:
+            return None
+
+
+def prompt_autocomplete(prompt: str, candidates: List[str], default: str = "") -> str:
+    default_str = f" [{default}]" if default else ""
+    completer = StationTabCompleter(candidates)
+    
+    try:
+        readline.set_completer(completer.complete)
+        readline.set_completer_delims(" \t\n`~!@#$%^&*()=+[{]}\\|;:'\",<>?")
+        readline.parse_and_bind("tab: complete")
+        val = input(f"\033[1;36m? {prompt}\033[0m (Press \033[1;33m[TAB]\033[0m to auto-complete){default_str}: ").strip()
+        return val if val else default
+    except (EOFError, KeyboardInterrupt):
+        return default
+    finally:
+        readline.set_completer(None)
 
 
 def prompt_choice(prompt: str, choices: List[str], default_idx: int = 0) -> int:
@@ -34,7 +71,7 @@ def prompt_text(prompt: str, default: str = "") -> str:
 
 
 def interactive_create_task() -> Optional[TrackingTask]:
-    """Guides the user through creating a new tracking task."""
+    """Guides the user through creating a new tracking task with direct station input and TAB auto-complete."""
     print("\n" + "=" * 55)
     print("       🚀 \033[1;32mNOTIFYSEAT - NEW ROUTE TRACKER WIZARD\033[0m")
     print("=" * 55)
@@ -51,19 +88,31 @@ def interactive_create_task() -> Optional[TrackingTask]:
     selected_transport = t_types[t_idx]
     provider = registry.get(selected_transport)
 
-    # Popular routes quick pick
-    popular = provider.get_popular_routes()
-    pop_labels = [p.get("label", f"{p['origin']} ➔ {p['destination']}") for p in popular]
-    pop_labels.append("Custom Route (Type your own stations/cities)...")
-
-    r_idx = prompt_choice("Choose a Route:", pop_labels, default_idx=0)
-
-    if r_idx < len(popular):
-        origin = popular[r_idx]["origin"]
-        destination = popular[r_idx]["destination"]
+    # Direct Station / City Entry with TAB Autocomplete
+    if selected_transport == TransportType.TCDD:
+        station_candidates = [s["name"] for s in TCDD_STATIONS]
+        default_origin = "İstanbul(Söğütlüçeşme)"
+        default_destination = "Ankara Gar"
     else:
-        origin = prompt_text("Enter Departure Station/City/Airport:", default="İstanbul(Söğütlüçeşme)")
-        destination = prompt_text("Enter Arrival Station/City/Airport:", default="Ankara Gar")
+        station_candidates = ["İstanbul (IST)", "İstanbul (SAW)", "Ankara (ESB)", "İzmir (ADB)", "Antalya (AYT)", "Bodrum (BJV)", "Trabzon (TZX)", "Eskişehir", "Konya", "Bursa"]
+        default_origin = "İstanbul"
+        default_destination = "Ankara"
+
+    print("\n\033[1;33m👉 Type the station or city name (Press [TAB] to auto-complete):\033[0m")
+    raw_origin = prompt_autocomplete("Enter Departure Station / City", candidates=station_candidates, default=default_origin)
+    raw_dest = prompt_autocomplete("Enter Arrival Station / City", candidates=station_candidates, default=default_destination)
+
+    # Intelligent fuzzy matching
+    if selected_transport == TransportType.TCDD:
+        res_orig = provider.get_station_by_name(raw_origin)
+        res_dest = provider.get_station_by_name(raw_dest)
+        origin = res_orig["name"] if res_orig else raw_origin
+        destination = res_dest["name"] if res_dest else raw_dest
+    else:
+        origin = raw_origin
+        destination = raw_dest
+
+    print(f"\n✔ Selected Route: \033[1;32m{origin} ➔ {destination}\033[0m")
 
     # 2. Date
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y")

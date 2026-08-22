@@ -94,12 +94,21 @@ class TCDDProvider(BaseProvider):
         return matches
 
     def get_station_by_name(self, name: str) -> Optional[Dict[str, str]]:
+        if not name:
+            return None
         q_norm = normalize_tr(name)
+        # 1. Exact match against station name or alias
         for s in TCDD_STATIONS:
-            s_norm = normalize_tr(s["name"])
-            if q_norm == s_norm or s_norm in q_norm or q_norm in s_norm:
+            if q_norm == normalize_tr(s["name"]):
                 return s
             if any(q_norm == normalize_tr(a) for a in s.get("aliases", [])):
+                return s
+        # 2. Substring / partial match
+        for s in TCDD_STATIONS:
+            s_norm = normalize_tr(s["name"])
+            if q_norm in s_norm or s_norm in q_norm:
+                return s
+            if any(q_norm in normalize_tr(a) or normalize_tr(a) in q_norm for a in s.get("aliases", [])):
                 return s
         return None
 
