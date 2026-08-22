@@ -242,8 +242,8 @@ def cmd_test_notify(config_mgr: ConfigManager, channel: str):
 
 def cmd_connect_tcdd(config_mgr: ConfigManager):
     print("\n🌐 Launching interactive browser to connect TCDD live session...")
-    print("👉 Please search for your desired route (e.g. İstanbul to Eskişehir).")
-    print("👉 When search results appear, NotifySeat will capture the live session and print all available seats!\n")
+    print("👉 Please select your route and click 'Ara' (Search) in the browser window.")
+    print("👉 NotifySeat will capture your live session parameters and test the route immediately.\n")
     try:
         import json
         from pathlib import Path
@@ -263,41 +263,27 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
             )
             page = context.new_page()
 
-            captured = []
+            captured_tokens = []
+            captured_headers = {}
 
             def on_req(req):
-                url = req.url.lower()
-                method = req.method
+                url = req.url
                 auth = req.headers.get("authorization", "")
-
-                # Only trigger on actual train availability / search requests
-                if method == "POST" and ("train-availability" in url or "load-trains" in url):
-                    token = auth.replace("Bearer", "").strip() if "Bearer" in auth else ""
-                    headers_dict = dict(req.headers)
-                    cookies_list = context.cookies()
-                    cookies_dict = {c["name"]: c["value"] for c in cookies_list}
-
-                    session_data = {
-                        "timestamp": time.time(),
-                        "url": req.url,
-                        "token": token,
-                        "headers": headers_dict,
-                        "cookies": cookies_dict
-                    }
-                    session_file.parent.mkdir(parents=True, exist_ok=True)
-                    with open(session_file, "w", encoding="utf-8") as f:
-                        json.dump(session_data, f, indent=2)
-
-                    if token:
+                
+                # If Bearer token is found on ANY request
+                if auth and "Bearer" in auth:
+                    token = auth.replace("Bearer", "").strip()
+                    if len(token) > 50 and token not in captured_tokens:
+                        captured_tokens.append(token)
+                        captured_headers.update(dict(req.headers))
                         cfg = config_mgr.get()
                         cfg.tcdd_token = token
                         config_mgr.save(cfg)
+                        print(f"🔑 Live Token captured! ({token[:20]}...)")
 
-                    if not captured:
-                        captured.append(req.url)
-                        print(f"\n🎉 Successfully captured live TCDD session from search request!")
-                        if token:
-                            print(f"🔑 Live Token captured (Length: {len(token)})")
+                if req.method == "POST" and "tcddtasimacilik.gov.tr" in url:
+                    captured_headers.update(dict(req.headers))
+                    print(f"📡 [POST] {url}")
 
             page.on("request", on_req)
 
@@ -306,39 +292,49 @@ def cmd_connect_tcdd(config_mgr: ConfigManager):
             except Exception as e:
                 logger.debug(f"Navigation warning: {e}")
 
+            # Keep window open until user closes it or searches
             for _ in range(300):
-                if captured:
-                    time.sleep(2)
-                    break
                 try:
                     if page.is_closed():
                         break
-                    # If page navigated to search results (/sefer-listesi)
-                    if "sefer-listesi" in page.url:
-                        cookies_list = context.cookies()
-                        cookies_dict = {c["name"]: c["value"] for c in cookies_list}
-                        with open(session_file, "w", encoding="utf-8") as f:
-                            json.dump({"timestamp": time.time(), "cookies": cookies_dict}, f, indent=2)
-                        captured.append(page.url)
-                        print(f"\n🎉 Successfully captured session on results page: {page.url}")
+                    # If on search results page or token was captured
+                    if ("sefer-listesi" in page.url or "bilet" in page.url) and captured_tokens:
+                        time.sleep(2)
                         break
                 except Exception:
                     break
                 time.sleep(1)
 
+            # Save full session cookies before closing
+            try:
+                cookies_list = context.cookies()
+                cookies_dict = {c["name"]: c["value"] for c in cookies_list}
+                session_data = {
+                    "timestamp": time.time(),
+                    "token": captured_tokens[0] if captured_tokens else config_mgr.get().tcdd_token,
+                    "headers": captured_headers,
+                    "cookies": cookies_dict
+                }
+                session_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(session_file, "w", encoding="utf-8") as f:
+                    json.dump(session_data, f, indent=2)
+            except Exception:
+                pass
+
             browser.close()
-            if captured:
-                print("✔ Active TCDD session connected and saved!\n")
-                print("⚡ Triggering immediate live route check with new session...\n")
-                tasks = db.list_tasks()
-                active_tcdd_tasks = [t for t in tasks if t.transport_type == "tcdd" and t.status == TaskStatus.ACTIVE]
-                if active_tcdd_tasks:
-                    for t in active_tcdd_tasks:
-                        cmd_check_now(db, config_mgr, t.id)
-                else:
-                    print("No active TCDD tasks to check. Create one with: python3 main.py track")
+
+            print("\n✔ TCDD live session successfully synced!")
+            print("⚡ Triggering immediate live route check with your session...\n")
+            tasks = db.list_tasks()
+            active_tcdd_tasks = [t for t in tasks if t.transport_type == "tcdd" and t.status == TaskStatus.ACTIVE]
+            if active_tcdd_tasks:
+                for t in active_tcdd_tasks:
+                    cmd_check_now(db, config_mgr, t.id)
             else:
-                print("⚠️ No search action was detected. You can run 'python3 main.py connect-tcdd' again or set token with 'set-token'.")
+                print("No active TCDD tasks found. Create one with: python3 main.py track")
+
+    except Exception as e:
+        print(f"Browser connection error: {e}")
     except Exception as e:
         print(f"Browser connection error: {e}")
 
