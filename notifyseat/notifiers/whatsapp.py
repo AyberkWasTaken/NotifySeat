@@ -8,6 +8,23 @@ from notifyseat.core.config import WhatsAppConfig
 from notifyseat.core.logger import logger
 
 
+def normalize_phone_number(phone: str) -> str:
+    """Normalizes Turkish and international phone numbers to E.164 (+905xxxxxxxxx)."""
+    if not phone:
+        return ""
+    raw = phone.strip()
+    digits = "".join(c for c in raw if c.isdigit())
+    if raw.startswith("+"):
+        return "+" + digits
+    if len(digits) == 10 and digits.startswith("5"):
+        return "+90" + digits
+    if len(digits) == 11 and digits.startswith("05"):
+        return "+90" + digits[1:]
+    if len(digits) == 12 and digits.startswith("90"):
+        return "+" + digits
+    return "+" + digits
+
+
 class WhatsAppNotifier(BaseNotifier):
     """Sends notifications directly to user's WhatsApp via CallMeBot gateway."""
 
@@ -28,9 +45,7 @@ class WhatsAppNotifier(BaseNotifier):
         if not self.config.enabled or not self.config.phone_number or not self.config.apikey:
             return False
 
-        phone = self.config.phone_number.strip().replace(" ", "").replace("-", "")
-        if not phone.startswith("+"):
-            phone = "+" + phone
+        phone = normalize_phone_number(self.config.phone_number)
 
         text = f"🚨 *{title}*\n\n{message}"
         if task:

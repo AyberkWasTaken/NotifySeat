@@ -113,9 +113,28 @@ def interactive_create_task() -> Optional[TrackingTask]:
     return task
 
 
+def open_url_quietly(url: str):
+    """Opens a URL in default browser without letting subprocess stderr leak into the terminal."""
+    import subprocess
+    import shutil
+    try:
+        if shutil.which("xdg-open"):
+            subprocess.Popen(
+                ["xdg-open", url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+        else:
+            import webbrowser
+            webbrowser.open(url)
+    except Exception:
+        pass
+
+
 def interactive_config(config_mgr):
     """Interactive wizard to configure Email and WhatsApp notifications with auto-browser opening."""
-    import webbrowser
+    from notifyseat.notifiers.whatsapp import normalize_phone_number
     cfg = config_mgr.get()
 
     print("\n\033[1;36m==================================================\033[0m")
@@ -123,8 +142,8 @@ def interactive_config(config_mgr):
     print("\033[1;36m==================================================\033[0m")
     print("Receive instant seat cancellation alerts on your phone or inbox.\n")
 
-    wa_status = "🟢 ENABLED" if cfg.whatsapp.enabled and cfg.whatsapp.phone_number else "⚪ DISABLED"
-    em_status = "🟢 ENABLED" if cfg.email.enabled and cfg.email.recipient_email else "⚪ DISABLED"
+    wa_status = f"🟢 ENABLED ({cfg.whatsapp.phone_number})" if cfg.whatsapp.enabled and cfg.whatsapp.phone_number else "⚪ DISABLED"
+    em_status = f"🟢 ENABLED ({cfg.email.recipient_email})" if cfg.email.enabled and cfg.email.recipient_email else "⚪ DISABLED"
 
     options = [
         f"📱 Configure WhatsApp (Direct WhatsApp alerts to your phone) [{wa_status}]",
@@ -149,26 +168,24 @@ def interactive_config(config_mgr):
         w_mode = prompt_choice("How would you like to authorize WhatsApp?", wa_choices, default_idx=0)
 
         if w_mode == 0:
-            try:
-                webbrowser.open("https://wa.me/34623789580?text=I+allow+callmebot+to+send+me+messages")
-                print("\n🌐 Opened WhatsApp link with pre-filled message.")
-            except Exception:
-                pass
+            open_url_quietly("https://wa.me/34623789580?text=I+allow+callmebot+to+send+me+messages")
+            print("\n🌐 Opened WhatsApp link with pre-filled message.")
         else:
             print("\n📲 Please open WhatsApp on your phone:")
             print("  1. Message \033[1;36m+34 623 78 95 80\033[0m")
             print("  2. Send: \033[1;33mI allow callmebot to send me messages\033[0m")
             print("  3. CallMeBot will reply with your API Key (e.g. 123456).\n")
 
-        phone = prompt_text("Enter your WhatsApp Phone Number (with country code, e.g. +905321234567):", default=cfg.whatsapp.phone_number or "+90")
-        apikey = prompt_text("Enter the API Key sent to you by CallMeBot (e.g. 123456):", default=cfg.whatsapp.apikey)
+        phone_raw = prompt_text("Enter your WhatsApp Phone Number (e.g. 05051234567 or +905051234567):", default=cfg.whatsapp.phone_number or "")
+        phone = normalize_phone_number(phone_raw)
+        apikey = prompt_text("Enter the API Key sent to you by CallMeBot (e.g. 1897404):", default=cfg.whatsapp.apikey)
 
         if phone and apikey:
-            cfg.whatsapp.phone_number = phone.strip()
+            cfg.whatsapp.phone_number = phone
             cfg.whatsapp.apikey = apikey.strip()
             cfg.whatsapp.enabled = True
             config_mgr.save(cfg)
-            print("\n\033[1;32m✔ WhatsApp configuration saved!\033[0m")
+            print(f"\n\033[1;32m✔ WhatsApp configuration saved for {phone}!\033[0m")
 
             test_now = prompt_text("Send an instant test WhatsApp alert to your phone? (Y/n):", default="y").lower().startswith("y")
             if test_now:
@@ -176,7 +193,7 @@ def interactive_config(config_mgr):
                 wn = WhatsAppNotifier(cfg.whatsapp)
                 print("⏳ Sending test WhatsApp alert...")
                 if wn.test():
-                    print("\033[1;32m✔ Test WhatsApp message SENT successfully to your phone!\033[0m\n")
+                    print(f"\033[1;32m✔ Test WhatsApp message SENT successfully to {phone}!\033[0m\n")
                 else:
                     print("\033[1;31m✖ WhatsApp delivery failed. Please verify your phone number and API key.\033[0m\n")
 
@@ -189,14 +206,11 @@ def interactive_config(config_mgr):
         if p_idx == 0:
             # Gmail
             print("\n👉 For Gmail, Google requires a 16-character 'App Password'.")
-            print("We will now open your Google Account App Passwords page in your browser.")
+            print("We will open your Google Account App Passwords page in your browser.")
             open_g = prompt_text("Open Google App Passwords page now? (Y/n):", default="y").lower().startswith("y")
             if open_g:
-                try:
-                    webbrowser.open("https://myaccount.google.com/apppasswords")
-                    print("🌐 Opened Google App Passwords in your browser.")
-                except Exception:
-                    pass
+                open_url_quietly("https://myaccount.google.com/apppasswords")
+                print("🌐 Opened Google App Passwords in your browser.")
 
             email_addr = prompt_text("Enter your Gmail address (e.g. user@gmail.com):", default=cfg.email.username or "")
             app_pass = prompt_text("Enter your 16-character Google App Password:", default=cfg.email.password or "")
