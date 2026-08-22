@@ -33,7 +33,7 @@ def print_banner():
  | |\  | (_) | |_| |  _| |_| |___) |  __/ (_| | |_ 
  |_| \_|\___/ \__|_|_|  \__, |____/ \___|\__,_|\__|
                         |___/                      
-[/bold cyan][dim]Local-First Transport Seat & Cancellation Notifier • Made for Ayberk[/dim]
+[/bold cyan][dim]Local-First Transport Seat & Cancellation Notifier[/dim]
 """
         console.print(banner)
     else:

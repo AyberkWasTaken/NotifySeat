@@ -1,7 +1,6 @@
 # 🚅 NotifySeat
 
-> **Local-First Public Transport Seat & Cancellation Notifier**  
-> *Crafted for Ayberk*
+> **Local-First Public Transport Seat & Cancellation Notifier**
 
 NotifySeat is a **100% local, privacy-focused transport seat availability and cancellation radar**. It runs directly on your local computer (leaving your machine on to monitor) without requiring any cloud servers, backend hosting, or third-party subscription fees.
 

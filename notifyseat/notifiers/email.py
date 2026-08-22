@@ -80,7 +80,7 @@ class EmailNotifier(BaseNotifier):
                     {booking_btn}
                 </div>
                 <div style="background: #f8fafc; padding: 12px; text-align: center; color: #94a3b8; font-size: 12px;">
-                    Sent locally by NotifySeat for Ayberk
+                    Sent locally by NotifySeat
                 </div>
             </div>
         </body>
