@@ -64,7 +64,7 @@ class ServiceInfo:
 @dataclass
 class TrackingTask:
     """Represents a route tracking task saved by the user."""
-    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    id: str = ""
     name: str = ""
     transport_type: TransportType = TransportType.TCDD
     origin: str = ""

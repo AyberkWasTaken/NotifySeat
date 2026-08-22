@@ -81,13 +81,38 @@ class Database:
                 )
             """)
 
+            # Migration: Ensure all tasks have clean sequential integer IDs
+            cursor.execute("SELECT id, created_at FROM tasks ORDER BY created_at ASC")
+            all_tasks = cursor.fetchall()
+            needs_migration = any(not r["id"].isdigit() for r in all_tasks)
+            if needs_migration:
+                for idx, r in enumerate(all_tasks, 1):
+                    old_id = r["id"]
+                    new_id = str(idx)
+                    if old_id != new_id:
+                        cursor.execute("UPDATE tasks SET id = ? WHERE id = ?", (new_id, old_id))
+                        cursor.execute("UPDATE check_logs SET task_id = ? WHERE task_id = ?", (new_id, old_id))
+
             conn.commit()
 
     # --- Task Operations ---
 
+    def _generate_next_id(self, cursor) -> str:
+        cursor.execute("SELECT id FROM tasks")
+        rows = cursor.fetchall()
+        nums = []
+        for r in rows:
+            val = r["id"]
+            if val and val.isdigit():
+                nums.append(int(val))
+        return str(max(nums) + 1 if nums else 1)
+
     def create_task(self, task: TrackingTask) -> TrackingTask:
         with self._get_connection() as conn:
             cursor = conn.cursor()
+            if not task.id:
+                task.id = self._generate_next_id(cursor)
+
             cursor.execute("""
                 INSERT INTO tasks (
                     id, name, transport_type, origin, origin_id,
@@ -122,10 +147,14 @@ class Database:
         return task
 
     def get_task(self, task_id: str) -> Optional[TrackingTask]:
+        task_id = str(task_id).strip()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
             row = cursor.fetchone()
+            if not row:
+                cursor.execute("SELECT * FROM tasks WHERE id LIKE ?", (f"{task_id}%",))
+                row = cursor.fetchone()
             if not row:
                 return None
             return self._row_to_task(row)
@@ -134,20 +163,22 @@ class Database:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             if status:
-                cursor.execute("SELECT * FROM tasks WHERE status = ? ORDER BY created_at DESC", (status.value,))
+                cursor.execute("SELECT * FROM tasks WHERE status = ? ORDER BY CAST(id AS INTEGER) ASC, created_at DESC", (status.value,))
             else:
-                cursor.execute("SELECT * FROM tasks ORDER BY created_at DESC")
+                cursor.execute("SELECT * FROM tasks ORDER BY CAST(id AS INTEGER) ASC, created_at DESC")
             rows = cursor.fetchall()
             return [self._row_to_task(r) for r in rows]
 
     def update_task_status(self, task_id: str, status: TaskStatus) -> bool:
+        task_id = str(task_id).strip()
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("UPDATE tasks SET status = ? WHERE id = ?", (status.value, task_id))
+            cursor.execute("UPDATE tasks SET status = ? WHERE id = ? OR id LIKE ?", (status.value, task_id, f"{task_id}%"))
             conn.commit()
             return cursor.rowcount > 0
 
     def update_task_check_state(self, task_id: str, last_checked: str, found_seats: int, service_info: Optional[Dict[str, Any]], status: Optional[TaskStatus] = None) -> bool:
+        task_id = str(task_id).strip()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             if status:
@@ -166,10 +197,15 @@ class Database:
             return cursor.rowcount > 0
 
     def delete_task(self, task_id: str) -> bool:
+        task_id = str(task_id).strip()
+        task = self.get_task(task_id)
+        if not task:
+            return False
+        real_id = task.id
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-            cursor.execute("DELETE FROM check_logs WHERE task_id = ?", (task_id,))
+            cursor.execute("DELETE FROM tasks WHERE id = ?", (real_id,))
+            cursor.execute("DELETE FROM check_logs WHERE task_id = ?", (real_id,))
             conn.commit()
             return cursor.rowcount > 0
 

@@ -93,16 +93,7 @@ def interactive_create_task() -> Optional[TrackingTask]:
     interval_sec = 60
 
     # 5. Notification Channels
-    print("\n\033[1;36mSelect Notification Channels (Desktop is enabled by default):\033[0m")
     channels = ["desktop"]
-    if prompt_text("Send Telegram alerts if seat opens? (y/N):", default="n").lower().startswith("y"):
-        channels.append("telegram")
-    if prompt_text("Send Discord webhook alerts? (y/N):", default="n").lower().startswith("y"):
-        channels.append("discord")
-    if prompt_text("Send Email alerts? (y/N):", default="n").lower().startswith("y"):
-        channels.append("email")
-    if prompt_text("Send SMS alerts? (y/N):", default="n").lower().startswith("y"):
-        channels.append("sms")
 
     task = TrackingTask(
         transport_type=selected_transport,
