@@ -55,15 +55,11 @@ def prompt_autocomplete(prompt: str, candidates: List[str]) -> str:
         readline.set_completer(completer.complete)
         readline.set_completer_delims(" \t\n`~!@#$%^&*()=+[{]}\\|;:'\",<>?")
         readline.parse_and_bind("tab: complete")
-        readline.parse_and_bind("set show-all-if-ambiguous on")
         readline.parse_and_bind("set completion-ignore-case on")
-        readline.parse_and_bind("set completion-query-items 100")
-        while True:
-            val = input(prompt_str).strip()
-            if val:
-                return val
+        val = input(prompt_str).strip()
+        return val
     except (EOFError, KeyboardInterrupt):
-        return ""
+        raise KeyboardInterrupt
     finally:
         readline.set_completer(None)
 
@@ -82,8 +78,10 @@ def prompt_choice(prompt: str, choices: List[str], default_idx: int = 0) -> int:
             idx = int(val) - 1
             if 0 <= idx < len(choices):
                 return idx
-        except (ValueError, EOFError):
+        except EOFError:
             return default_idx
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
         print("Invalid selection, please try again.")
 
 
@@ -94,15 +92,24 @@ def prompt_text(prompt: str, default: str = "") -> str:
     try:
         val = input(f"{C_CYAN}? {prompt}:{C_RESET}{default_str} ").strip()
         return val if val else default
-    except (EOFError, KeyboardInterrupt):
+    except EOFError:
         return default
+    except KeyboardInterrupt:
+        raise KeyboardInterrupt
 
 
 def interactive_create_task() -> Optional[TrackingTask]:
-    """Guides the user through creating a new TCDD route tracking task with direct station input and TAB auto-complete."""
+    """Guides the user through creating a new TCDD route tracking task."""
     print("\n" + "=" * 55)
     print("       🚀 \033[1;32mNOTIFYSEAT - NEW TCDD TRAIN TRACKER\033[0m")
-    print("=" * 55 + "\n")
+    print("=" * 55)
+
+    print("\n\033[1;36m📌 Major Stations & Cities:\033[0m")
+    print("  • \033[1;37mİstanbul\033[0m (Söğütlüçeşme, Halkalı, Pendik, Bostancı, Bakırköy)")
+    print("  • \033[1;37mAnkara\033[0m (Ankara Gar, Eryaman YHT)")
+    print("  • \033[1;37mEskişehir, Konya, Karaman, Sivas, Yozgat\033[0m")
+    print("  • \033[1;37mİzmir (Basmane / Alsancak), İzmit, Gebze, Bilecik, Sakarya\033[0m")
+    print("  • \033[1;37mAdana, Kayseri, Kars, Kırıkkale, Denizli, Diyarbakır, Gaziantep\033[0m\n")
 
     provider = registry.get(TransportType.TCDD)
     
@@ -115,10 +122,10 @@ def interactive_create_task() -> Optional[TrackingTask]:
 
     raw_origin = prompt_autocomplete("Enter Departure Station", candidates=station_candidates)
     if not raw_origin:
-        return None
+        raw_origin = "İstanbul(Söğütlüçeşme)"
     raw_dest = prompt_autocomplete("Enter Arrival Station", candidates=station_candidates)
     if not raw_dest:
-        return None
+        raw_dest = "Ankara Gar"
 
     # Intelligent fuzzy matching (e.g. 'ankaragar' -> 'Ankara Gar', 'sogutlucesme' -> 'İstanbul(Söğütlüçeşme)')
     res_orig = provider.get_station_by_name(raw_origin)
@@ -126,7 +133,7 @@ def interactive_create_task() -> Optional[TrackingTask]:
     origin = res_orig["name"] if res_orig else raw_origin
     destination = res_dest["name"] if res_dest else raw_dest
 
-    print(f"\n✔ Route: \033[1;32m{origin} ➔ {destination}\033[0m\n")
+    print(f"\n✔ Selected Route: \033[1;32m{origin} ➔ {destination}\033[0m\n")
 
     # Date
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y")

@@ -357,36 +357,40 @@ def main():
         print("  notifyseat resume <id>   ➔ Resume monitoring for a task\n")
         return
 
-    if args.command == "list":
-        cmd_list(db)
-    elif args.command == "track":
-        cmd_track(db, args)
-    elif args.command == "check":
-        cmd_check_now(db, config_mgr, args.task_id)
-    elif args.command in ("run", "start"):
-        cmd_run(db, config_mgr, args)
-    elif args.command in ("config", "notify-setup"):
-        cmd_config(config_mgr)
-    elif args.command == "test-notify":
-        cmd_test_notify(config_mgr, args.channel)
-    elif args.command == "delete":
-        if db.delete_task(args.task_id):
-            print(f"✔ Task [{args.task_id}] deleted.")
-        else:
-            print(f"✖ Task [{args.task_id}] not found.")
-    elif args.command == "pause":
-        if db.update_task_status(args.task_id, TaskStatus.PAUSED):
-            print(f"✔ Task [{args.task_id}] paused.")
-        else:
-            print(f"✖ Task [{args.task_id}] not found.")
-    elif args.command == "resume":
-        if db.update_task_status(args.task_id, TaskStatus.ACTIVE):
-            print(f"✔ Task [{args.task_id}] resumed.")
-        else:
-            print(f"✖ Task [{args.task_id}] not found.")
-    elif args.command == "gui":
-        from notifyseat.web.server import run_web_server
-        run_web_server(host=args.host, port=args.port)
+    try:
+        if args.command == "list":
+            cmd_list(db)
+        elif args.command == "track":
+            cmd_track(db, args)
+        elif args.command == "check":
+            cmd_check_now(db, config_mgr, args.task_id)
+        elif args.command in ("run", "start"):
+            cmd_run(db, config_mgr, args)
+        elif args.command in ("config", "notify-setup"):
+            cmd_config(config_mgr)
+        elif args.command == "test-notify":
+            cmd_test_notify(config_mgr, args.channel)
+        elif args.command == "delete":
+            if db.delete_task(args.task_id):
+                print(f"✔ Task [{args.task_id}] deleted.")
+            else:
+                print(f"✖ Task [{args.task_id}] not found.")
+        elif args.command == "pause":
+            if db.update_task_status(args.task_id, TaskStatus.PAUSED):
+                print(f"✔ Task [{args.task_id}] paused.")
+            else:
+                print(f"✖ Task [{args.task_id}] not found.")
+        elif args.command == "resume":
+            if db.update_task_status(args.task_id, TaskStatus.ACTIVE):
+                print(f"✔ Task [{args.task_id}] resumed.")
+            else:
+                print(f"✖ Task [{args.task_id}] not found.")
+        elif args.command == "gui":
+            from notifyseat.web.server import run_web_server
+            run_web_server(host=args.host, port=args.port)
+    except KeyboardInterrupt:
+        print("\n\n\033[2mOperation cancelled.\033[0m\n")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
