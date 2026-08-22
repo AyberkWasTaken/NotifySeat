@@ -30,11 +30,19 @@ def prompt_autocomplete(prompt: str, candidates: List[str], default: str = "") -
     default_str = f" [{default}]" if default else ""
     completer = StationTabCompleter(candidates)
     
+    C_CYAN = "\001\033[1;36m\002"
+    C_YELLOW = "\001\033[1;33m\002"
+    C_RESET = "\001\033[0m\002"
+    prompt_str = f"{C_CYAN}? {prompt}{C_RESET} ({C_YELLOW}[TAB]{C_RESET} autocomplete){default_str}: "
+
     try:
         readline.set_completer(completer.complete)
         readline.set_completer_delims(" \t\n`~!@#$%^&*()=+[{]}\\|;:'\",<>?")
         readline.parse_and_bind("tab: complete")
-        val = input(f"\033[1;36m? {prompt}\033[0m (Press \033[1;33m[TAB]\033[0m to auto-complete){default_str}: ").strip()
+        readline.parse_and_bind("set show-all-if-ambiguous on")
+        readline.parse_and_bind("set completion-ignore-case on")
+        readline.parse_and_bind("set completion-query-items 100")
+        val = input(prompt_str).strip()
         return val if val else default
     except (EOFError, KeyboardInterrupt):
         return default
@@ -63,62 +71,41 @@ def prompt_choice(prompt: str, choices: List[str], default_idx: int = 0) -> int:
 
 def prompt_text(prompt: str, default: str = "") -> str:
     default_str = f" [{default}]" if default else ""
+    C_CYAN = "\001\033[1;36m\002"
+    C_RESET = "\001\033[0m\002"
     try:
-        val = input(f"\033[1;36m? {prompt}\033[0m{default_str}: ").strip()
+        val = input(f"{C_CYAN}? {prompt}{C_RESET}{default_str}: ").strip()
         return val if val else default
     except (EOFError, KeyboardInterrupt):
         return default
 
 
 def interactive_create_task() -> Optional[TrackingTask]:
-    """Guides the user through creating a new tracking task with direct station input and TAB auto-complete."""
+    """Guides the user through creating a new TCDD route tracking task with direct station input and TAB auto-complete."""
     print("\n" + "=" * 55)
-    print("       🚀 \033[1;32mNOTIFYSEAT - NEW ROUTE TRACKER WIZARD\033[0m")
+    print("       🚀 \033[1;32mNOTIFYSEAT - NEW TCDD TRAIN TRACKER\033[0m")
     print("=" * 55)
 
-    # 1. Transport Type
-    transport_choices = [
-        "🚅 TCDD Train (YHT High Speed & Mainline)",
-        "✈️  Flight (Pegasus Airlines / THY / SunExpress)",
-        "🚌 Intercity Bus (Pamukkale / Kamil Koç / Metro / Obilet)"
-    ]
-    t_idx = prompt_choice("Select Transport Mode:", transport_choices, default_idx=0)
-    
-    t_types = [TransportType.TCDD, TransportType.FLIGHT, TransportType.BUS]
-    selected_transport = t_types[t_idx]
-    provider = registry.get(selected_transport)
-
-    # Direct Station / City Entry with TAB Autocomplete
-    if selected_transport == TransportType.TCDD:
-        station_candidates = [s["name"] for s in TCDD_STATIONS]
-        default_origin = "İstanbul(Söğütlüçeşme)"
-        default_destination = "Ankara Gar"
-    else:
-        station_candidates = ["İstanbul (IST)", "İstanbul (SAW)", "Ankara (ESB)", "İzmir (ADB)", "Antalya (AYT)", "Bodrum (BJV)", "Trabzon (TZX)", "Eskişehir", "Konya", "Bursa"]
-        default_origin = "İstanbul"
-        default_destination = "Ankara"
+    provider = registry.get(TransportType.TCDD)
+    station_candidates = [s["name"] for s in TCDD_STATIONS]
 
     print("\n\033[1;33m👉 Type the station or city name (Press [TAB] to auto-complete):\033[0m")
-    raw_origin = prompt_autocomplete("Enter Departure Station / City", candidates=station_candidates, default=default_origin)
-    raw_dest = prompt_autocomplete("Enter Arrival Station / City", candidates=station_candidates, default=default_destination)
+    raw_origin = prompt_autocomplete("Enter Departure Station", candidates=station_candidates, default="İstanbul(Söğütlüçeşme)")
+    raw_dest = prompt_autocomplete("Enter Arrival Station", candidates=station_candidates, default="Ankara Gar")
 
-    # Intelligent fuzzy matching
-    if selected_transport == TransportType.TCDD:
-        res_orig = provider.get_station_by_name(raw_origin)
-        res_dest = provider.get_station_by_name(raw_dest)
-        origin = res_orig["name"] if res_orig else raw_origin
-        destination = res_dest["name"] if res_dest else raw_dest
-    else:
-        origin = raw_origin
-        destination = raw_dest
+    # Intelligent fuzzy matching (e.g. 'ankaragar' -> 'Ankara Gar', 'sogutlucesme' -> 'İstanbul(Söğütlüçeşme)')
+    res_orig = provider.get_station_by_name(raw_origin)
+    res_dest = provider.get_station_by_name(raw_dest)
+    origin = res_orig["name"] if res_orig else raw_origin
+    destination = res_dest["name"] if res_dest else raw_dest
 
-    print(f"\n✔ Selected Route: \033[1;32m{origin} ➔ {destination}\033[0m")
+    print(f"\n✔ Selected Route: \033[1;32m{origin} ➔ {destination}\033[0m\n")
 
-    # 2. Date
+    # Date
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y")
     date_str = prompt_text("Enter Travel Date (DD-MM-YYYY):", default=tomorrow)
 
-    # 3. Time Filter
+    # Time Filter
     time_choices = [
         "Any Time (Check all journeys of the day)",
         "Morning (05:00 - 12:00)",
@@ -137,28 +124,22 @@ def interactive_create_task() -> Optional[TrackingTask]:
     elif tm_idx == 4:
         time_filter = prompt_text("Enter specific departure hour (HH:MM):", default="08:30")
 
-    # 4. Check Interval (Fixed to 1 minute / 60 seconds)
-    interval_sec = 60
-
-    # 5. Notification Channels
-    channels = ["desktop"]
-
     task = TrackingTask(
-        transport_type=selected_transport,
+        transport_type=TransportType.TCDD,
         origin=origin,
         destination=destination,
         date=date_str,
         time_filter=time_filter,
-        check_interval_seconds=interval_sec,
-        notification_channels=channels,
+        check_interval_seconds=60,
+        notification_channels=["desktop"],
         status=TaskStatus.ACTIVE
     )
 
     print("\n\033[1;32m✔ Route tracker configured successfully!\033[0m")
-    print(f"  • Mode: {task.transport_type.upper()}")
     print(f"  • Route: {task.origin} ➔ {task.destination}")
     print(f"  • Date: {task.display_date}")
-    print(f"  • Radar: Checks every 60 seconds\n")
+    print(f"  • Window: {task.time_filter.title() if task.time_filter else 'All Day'}")
+    print(f"  • Radar: Checks every 60 seconds for cancellations\n")
     return task
 
 

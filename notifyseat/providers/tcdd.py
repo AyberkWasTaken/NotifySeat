@@ -50,10 +50,17 @@ ENGLISH_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
 
 
 def normalize_tr(text: str) -> str:
-    """Normalize Turkish characters for fuzzy matching."""
-    t = text.lower().strip()
-    tr_map = str.maketrans("ıİşŞğĞüÜöÖçÇ", "iissgguuoocc")
-    return t.translate(tr_map).replace(" ", "").replace("(", "").replace(")", "").replace("-", "")
+    """Normalize Turkish characters and accents for robust fuzzy matching."""
+    if not text:
+        return ""
+    t = text.replace("İ", "i").replace("I", "i").replace("ı", "i")
+    t = t.replace("Ş", "s").replace("ş", "s")
+    t = t.replace("Ğ", "g").replace("ğ", "g")
+    t = t.replace("Ü", "u").replace("ü", "u")
+    t = t.replace("Ö", "o").replace("ö", "o")
+    t = t.replace("Ç", "c").replace("ç", "c")
+    t = t.lower()
+    return "".join(c for c in t if c.isalnum())
 
 
 class TCDDProvider(BaseProvider):
