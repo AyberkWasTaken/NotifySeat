@@ -240,6 +240,57 @@ def cmd_test_notify(config_mgr: ConfigManager, channel: str):
         print(f"\033[1;31m✖ Test notification for '{channel}' failed. Please check configuration settings.\033[0m")
 
 
+def cmd_connect_tcdd(config_mgr: ConfigManager):
+    print("\n🌐 Launching interactive browser to connect TCDD live session...")
+    print("👉 Please search for any route on the page. NotifySeat will capture your active session automatically.\n")
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=False,
+                args=["--disable-blink-features=AutomationControlled"]
+            )
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                locale="tr-TR"
+            )
+            page = context.new_page()
+
+            captured = []
+            def on_req(req):
+                auth = req.headers.get("authorization", "")
+                if auth and "Bearer" in auth and ("train-availability" in req.url or "tms" in req.url or "train" in req.url):
+                    token = auth.replace("Bearer", "").strip()
+                    if len(token) > 50 and token not in captured:
+                        captured.append(token)
+                        cfg = config_mgr.get()
+                        cfg.tcdd_token = token
+                        config_mgr.save(cfg)
+                        print(f"\n🎉 Successfully captured active TCDD Bearer token!")
+
+            page.on("request", on_req)
+            page.goto("https://ebilet.tcddtasimacilik.gov.tr")
+
+            for _ in range(120):
+                if captured:
+                    time.sleep(2)
+                    break
+                try:
+                    if page.is_closed():
+                        break
+                except Exception:
+                    break
+                time.sleep(1)
+
+            browser.close()
+            if captured:
+                print("✔ Active TCDD session connected and saved to config!")
+            else:
+                print("⚠️ No active token was intercepted. You can also paste it with 'python3 main.py set-token <token>'.")
+    except Exception as e:
+        print(f"Browser connection error: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="notifyseat",
@@ -295,6 +346,10 @@ def main():
     tok_p = subparsers.add_parser("set-token", help="Set TCDD Web/Mobile session Bearer token")
     tok_p.add_argument("token", help="Bearer token copied from TCDD web app / devtools")
 
+    # connect-tcdd
+    subparsers.add_parser("connect-tcdd", help="Open browser to capture active TCDD session automatically")
+    subparsers.add_parser("connect", help="Alias for connect-tcdd")
+
     args = parser.parse_args()
 
     db = Database()
@@ -307,6 +362,7 @@ def main():
         print("  notifyseat track         ➔ Add a new route to monitor")
         print("  notifyseat run           ➔ Start the background monitoring engine")
         print("  notifyseat check <id>    ➔ Trigger immediate check for a task")
+        print("  notifyseat connect-tcdd  ➔ Open browser and connect TCDD session automatically")
         print("  notifyseat set-token <tok> ➔ Set active TCDD session bearer token")
         print("  notifyseat demo          ➔ Run an instant live cancellation demo")
         print("  notifyseat gui           ➔ Launch the local Web GUI dashboard")
@@ -323,6 +379,8 @@ def main():
         cmd_check_now(db, config_mgr, args.task_id)
     elif args.command in ("run", "start"):
         cmd_run(db, config_mgr, args)
+    elif args.command in ("connect-tcdd", "connect"):
+        cmd_connect_tcdd(config_mgr)
     elif args.command == "set-token":
         cfg = config_mgr.get()
         cfg.tcdd_token = args.token.strip().replace("Bearer ", "")
