@@ -134,9 +134,8 @@ class TCDDProvider(BaseProvider):
 
     def check_route(self, task: TrackingTask) -> CheckResult:
         """
-        Executes an authentic live seat check using:
-        1. Modern YTP API endpoint (with user/env bearer token)
-        2. Playwright Headless Browser fallback
+        Executes an authentic live seat check using the official TCDD YTP backend.
+        Never fabricates trains or seat counts.
         """
         import os
         from notifyseat.core.config import ConfigManager
@@ -144,30 +143,39 @@ class TCDDProvider(BaseProvider):
         origin_station = self.get_station_by_name(task.origin)
         dest_station = self.get_station_by_name(task.destination)
 
-        origin_name = origin_station["name"] if origin_station else task.origin
-        dest_name = dest_station["name"] if dest_station else task.destination
-        origin_id = int(origin_station["id"]) if (origin_station and str(origin_station["id"]).isdigit()) else 1325
-        dest_id = int(dest_station["id"]) if (dest_station and str(dest_station["id"]).isdigit()) else 93
+        if not origin_station or not dest_station:
+            missing = task.origin if not origin_station else task.destination
+            return CheckResult(
+                task_id=task.id,
+                success=False,
+                found=False,
+                seats_count=0,
+                services=[],
+                message=f"Station '{missing}' not found in official TCDD station directory."
+            )
+
+        origin_name = origin_station["name"]
+        dest_name = dest_station["name"]
+        origin_id = int(origin_station["id"])
+        dest_id = int(dest_station["id"])
 
         # Check configured tokens from config or environment
         custom_token = os.environ.get("TCDD_TOKEN") or ConfigManager().get().tcdd_token
 
-        # Strategy 1: Modern YTP API
+        # Call live TCDD YTP API
         result = self._check_via_ytp_api(task, origin_name, dest_name, origin_id, dest_id, custom_token=custom_token)
-        if result and result.success and result.found:
+        if result is not None:
             return result
 
-        # Strategy 2: Playwright Headless Automation
-        try:
-            from playwright.sync_api import sync_playwright  # noqa: F401
-            pw_result = self._check_via_playwright(task, origin_name, dest_name)
-            if pw_result and pw_result.success and pw_result.found:
-                return pw_result
-        except Exception as e:
-            logger.debug(f"Playwright check skipped or unavailable: {e}")
-
-        # Strategy 3: Corridor Timetable & Live Seat State Engine
-        return self._evaluate_corridor_schedule(task, origin_name, dest_name)
+        # Honest failure when TCDD API is blocked by WAF or no direct route exists
+        return CheckResult(
+            task_id=task.id,
+            success=False,
+            found=False,
+            seats_count=0,
+            services=[],
+            message=f"No direct trains found or TCDD API authorization required for {origin_name} ➔ {dest_name}. Please configure your TCDD session token via 'notifyseat config'."
+        )
 
     def _get_netscaler_cookies(self, force_refresh: bool = False) -> Dict[str, str]:
         """Manages Citrix NetScaler session cookies to bypass WAF bot checks."""
@@ -559,86 +567,3 @@ class TCDDProvider(BaseProvider):
             return 18 <= dep_h < 24
 
         return True
-
-    def _evaluate_corridor_schedule(self, task: TrackingTask, origin_name: str, dest_name: str) -> CheckResult:
-        """
-        Evaluates official TCDD YHT timetable departures for the selected corridor and time window.
-        Provides granular per-route departure times, wagon classes, and seat breakdown.
-        """
-        # Official real timetable departures for Istanbul (Söğütlüçeşme) ➔ Eskişehir corridor
-        corridor_trips = [
-            {"time": "06:05", "train": "YHT 81001", "name": "İstanbul - Ankara YHT", "pulman": 24, "business": 6},
-            {"time": "06:55", "train": "YHT 81003", "name": "İstanbul - Konya YHT", "pulman": 18, "business": 4},
-            {"time": "07:40", "train": "YHT 81005", "name": "İstanbul - Ankara YHT", "pulman": 32, "business": 8},
-            {"time": "08:45", "train": "YHT 81007", "name": "İstanbul - Karaman YHT", "pulman": 15, "business": 3},
-            {"time": "10:20", "train": "YHT 81009", "name": "İstanbul - Sivas YHT", "pulman": 45, "business": 11},
-            {"time": "12:15", "train": "YHT 81011", "name": "İstanbul - Ankara YHT", "pulman": 28, "business": 7},
-            {"time": "14:05", "train": "YHT 81013", "name": "İstanbul - Konya YHT", "pulman": 19, "business": 5},
-            {"time": "16:10", "train": "YHT 81015", "name": "İstanbul - Ankara YHT", "pulman": 12, "business": 2},
-            {"time": "17:30", "train": "YHT 81017", "name": "İstanbul - Ankara YHT", "pulman": 8, "business": 1},
-            {"time": "18:20", "train": "YHT 81019", "name": "İstanbul - Ankara YHT", "pulman": 42, "business": 10},
-            {"time": "18:55", "train": "YHT 81021", "name": "İstanbul - Konya YHT", "pulman": 36, "business": 8},
-            {"time": "19:40", "train": "YHT 81023", "name": "İstanbul - Ankara YHT", "pulman": 54, "business": 14},
-            {"time": "22:47", "train": "Ekspres 11001", "name": "Ankara Ekspresi", "pulman": 18, "business": 12},
-        ]
-
-        matching_services: List[ServiceInfo] = []
-        total_seats = 0
-        checked_trains_summary = []
-
-        for t in corridor_trips:
-            dep_time = t["time"]
-            if task.time_filter and not self._match_time_filter(dep_time, task.time_filter):
-                continue
-
-            pulman_seats = t["pulman"]
-            business_seats = t["business"]
-            train_seats = pulman_seats + business_seats
-            class_breakdown = {"Pulman": pulman_seats, "Business": business_seats}
-
-            if task.seat_class and task.seat_class != "ANY":
-                if task.seat_class.lower() == "business":
-                    train_seats = business_seats
-                    class_breakdown = {"Business": business_seats}
-                elif task.seat_class.lower() in ("pulman", "economy"):
-                    train_seats = pulman_seats
-                    class_breakdown = {"Pulman": pulman_seats}
-
-            checked_trains_summary.append(f"{dep_time} ({train_seats} seats)")
-
-            if train_seats > 0:
-                train_label = f"{t['train']} ({t.get('name', 'YHT')})"
-                matching_services.append(ServiceInfo(
-                    service_id=t["train"],
-                    service_name=train_label,
-                    departure_time=dep_time,
-                    arrival_time="",
-                    origin=origin_name,
-                    destination=dest_name,
-                    date=task.date,
-                    total_available_seats=train_seats,
-                    class_breakdown=class_breakdown,
-                    booking_url=self.BOOKING_URL,
-                    operator="TCDD Taşımacılık",
-                    notes=f"Found {train_seats} empty seats on {dep_time} route from {origin_name} to {dest_name}"
-                ))
-                total_seats += train_seats
-
-        found = total_seats >= task.min_seats
-        if found:
-            descriptions = []
-            for s in matching_services:
-                cls_str = ", ".join([f"{count} {cls_name}" for cls_name, count in s.class_breakdown.items() if count > 0])
-                descriptions.append(f"found {s.total_available_seats} empty seats on {s.departure_time} route ({cls_str})")
-            msg = f"🎉 {'; '.join(descriptions)} from {origin_name} to {dest_name} on {task.date}."
-        else:
-            msg = f"TCDD Live Check ({origin_name} ➔ {dest_name} on {task.date}): Checked {len(checked_trains_summary)} routes. Monitoring every {task.check_interval_seconds}s for cancellations..."
-
-        return CheckResult(
-            task_id=task.id,
-            success=True,
-            found=found,
-            seats_count=total_seats,
-            services=matching_services,
-            message=msg
-        )

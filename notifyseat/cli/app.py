@@ -168,7 +168,9 @@ def render_track_check_table(task: TrackingTask, result):
             else:
                 console.print(f"[yellow]● Status: All routes currently Sold Out. Monitoring for cancellations...[/yellow]\n")
         else:
-            if result.found:
+            if result.message:
+                console.print(f"[yellow]● {result.message}[/yellow]\n")
+            elif result.found:
                 console.print(f"[bold green]✔ Status: {result.seats_count} seat(s) available.[/bold green]\n")
             else:
                 console.print(f"[yellow]● Status: Sold Out. Monitoring...[/yellow]\n")
