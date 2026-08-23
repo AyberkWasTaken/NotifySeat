@@ -196,17 +196,8 @@ def cmd_check_now(db: Database, config_mgr: ConfigManager, task_id: Optional[str
     scheduler = EngineScheduler(db, cfg, notifier_mgr)
 
     for task in tasks:
-        result = scheduler.worker.execute_task(task)
-        now_str = datetime.now().isoformat()
-        last_service = result.services[0].to_dict() if result.services else None
-        db.update_task_check_state(
-            task_id=task.id,
-            last_checked=now_str,
-            found_seats=result.seats_count,
-            service_info=last_service
-        )
-        task.last_checked_at = now_str
-        task.last_found_seats = result.seats_count
+        # Manual CLI check: notify=False (never send external notifications on manual check)
+        result = scheduler.worker.execute_task(task, notify=False)
         render_track_check_table(task, result)
 
 

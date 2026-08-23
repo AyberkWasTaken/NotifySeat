@@ -261,11 +261,14 @@ def interactive_create_task() -> Optional[TrackingTask]:
         if not chosen_indices or len(chosen_indices) == len(scheduled_trains):
             time_filter = None
             selected_summary = "All Scheduled Trains"
+            initial_seats = sum(t.total_available_seats for t in scheduled_trains)
         else:
             chosen_trains = [scheduled_trains[i] for i in chosen_indices]
             time_filter = ", ".join([t.departure_time for t in chosen_trains if t.departure_time])
             selected_summary = f"{len(chosen_trains)} Train(s) ({time_filter})"
+            initial_seats = sum(t.total_available_seats for t in chosen_trains)
     else:
+        initial_seats = 0
         print("\n\033[1;33m⚠️ Could not retrieve live timetable. Fallback to manual window:\033[0m")
         time_choices = [
             "Any Time (Check all journeys of the day)",
@@ -293,7 +296,9 @@ def interactive_create_task() -> Optional[TrackingTask]:
         time_filter=time_filter,
         check_interval_seconds=300,
         notification_channels=["desktop"],
-        status=TaskStatus.ACTIVE
+        status=TaskStatus.ACTIVE,
+        last_found_seats=initial_seats,
+        last_checked_at=datetime.now().isoformat()
     )
 
     print("\n\033[1;32m✔ Route tracker configured successfully!\033[0m")

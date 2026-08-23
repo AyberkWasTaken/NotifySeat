@@ -21,8 +21,8 @@ class TaskWorker:
         self.notifier_mgr = notifier_mgr
         self.on_event_callback = on_event_callback
 
-    def execute_task(self, task: TrackingTask) -> CheckResult:
-        """Runs check for task, handles seat state changes, and sends alerts."""
+    def execute_task(self, task: TrackingTask, notify: bool = True) -> CheckResult:
+        """Runs check for task, handles seat state changes, and sends alerts only on 0 -> >0 seat transitions."""
         provider = registry.get(task.transport_type)
         
         # Emit checking event
@@ -50,13 +50,16 @@ class TaskWorker:
             details=result.to_dict()
         )
 
-        prev_seats = task.last_found_seats
+        prev_seats = task.last_found_seats if task.last_found_seats is not None else 0
         new_seats = result.seats_count
 
-        # State transition: Only notify when a sold-out route gets seats (0 -> >0)
-        # or when new cancellation seats open up (new_seats > prev_seats).
-        # Never send repeated alerts if seats stay the same.
-        should_notify = result.found and (prev_seats == 0 or new_seats > prev_seats)
+        # Exact cancellation trigger requested by Ayberk:
+        # Notify ONLY when:
+        # 1. notify is True (background engine mode, not manual CLI check)
+        # 2. Previous state was Sold Out (prev_seats == 0) and now seats opened up (new_seats > 0)
+        # 3. A baseline check has already been recorded (task.last_checked_at is not None)
+        is_opening_from_soldout = (task.last_checked_at is not None) and (prev_seats == 0) and (new_seats > 0)
+        should_notify = notify and result.found and is_opening_from_soldout
 
         if should_notify:
             open_services = [s for s in result.services if s.total_available_seats > 0]
@@ -105,6 +108,9 @@ class TaskWorker:
                 service_info=last_service_data,
                 status=new_status
             )
+            task.last_checked_at = now_str
+            task.last_found_seats = new_seats
+            task.status = new_status
 
             self._emit_event("seats_found", {
                 "task_id": task.id,
@@ -125,6 +131,8 @@ class TaskWorker:
                 found_seats=new_seats,
                 service_info=last_service_data
             )
+            task.last_checked_at = now_str
+            task.last_found_seats = new_seats
 
             self._emit_event("task_checked", {
                 "task_id": task.id,
