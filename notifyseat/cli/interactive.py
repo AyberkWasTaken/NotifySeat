@@ -94,8 +94,8 @@ def prompt_station(prompt: str) -> str:
 
 def prompt_multi_checkbox(title: str, options: List[str], initial_selected: Optional[List[bool]] = None) -> List[int]:
     """
-    Renders an interactive terminal multi-select menu with checkbox toggles.
-    Controls: Up/Down arrows (or j/k) to navigate, Space to toggle, 'a' for all, Enter to submit.
+    Renders a flicker-free, scrollable terminal multi-select menu with checkbox toggles.
+    Controls: Up/Down arrows (or j/k) to navigate, Space to toggle, 'a' for all/none, Enter to submit.
     """
     import sys
     import tty
@@ -108,28 +108,48 @@ def prompt_multi_checkbox(title: str, options: List[str], initial_selected: Opti
     cursor = 0
     num_opts = len(options)
 
+    # Window size: show up to 8 items at a time to strictly prevent terminal scrolling/duplication
+    window_size = min(8, num_opts)
+    total_render_lines = window_size + 2  # hint line + items + scroll status line
+
     # Hide cursor
     sys.stdout.write("\033[?25l")
     sys.stdout.flush()
 
     def render(first_render=False):
         if not first_render:
-            sys.stdout.write(f"\033[{num_opts}A")
-        
-        for idx in range(num_opts):
+            sys.stdout.write(f"\033[{total_render_lines}A")
+
+        # Determine visible window based on cursor position
+        if cursor < window_size // 2:
+            start_idx = 0
+        elif cursor >= num_opts - window_size // 2:
+            start_idx = max(0, num_opts - window_size)
+        else:
+            start_idx = cursor - window_size // 2
+        end_idx = min(start_idx + window_size, num_opts)
+
+        # Header status line
+        selected_count = sum(selected)
+        sys.stdout.write(f"\r\033[K\033[1;30m  (↑/↓: navigate, Space: toggle, 'a': all, Enter: confirm | {selected_count}/{num_opts} selected)\033[0m\n")
+
+        for idx in range(start_idx, end_idx):
             is_active = (idx == cursor)
             is_checked = selected[idx]
-            
+
             ptr = "\033[1;36m❯\033[0m " if is_active else "  "
             chk = "\033[1;32m[✔]\033[0m" if is_checked else "\033[1;30m[ ]\033[0m"
             text = options[idx]
-            
+
             sys.stdout.write(f"\r\033[K{ptr}{chk} {text}\n")
+
+        # Scroll indicator line
+        more_up = "▲ " if start_idx > 0 else "  "
+        more_down = "▼ " if end_idx < num_opts else "  "
+        sys.stdout.write(f"\r\033[K\033[1;30m  {more_up}Showing {start_idx + 1}-{end_idx} of {num_opts} trains {more_down}\033[0m\n")
         sys.stdout.flush()
 
     print(f"\n\033[1;36m{title}\033[0m")
-    print("\033[1;30m  (Controls: ↑/↓ to move, Space to toggle, 'a' for all/none, Enter to confirm)\033[0m\n")
-    
     render(first_render=True)
 
     fd = sys.stdin.fileno()
@@ -218,17 +238,22 @@ def interactive_create_task() -> Optional[TrackingTask]:
             dep = train.departure_time or "??"
             arr = train.arrival_time or ""
             route_times = f"{dep} ➔ {arr}" if arr else dep
-            train_label = train.service_name or f"Train {train.service_id}"
+            train_num = train.service_id or train.service_name.split()[0]
+            train_label = f"YHT {train_num}" if "yht" not in train_num.lower() and train_num.isdigit() else train_num
 
             if train.total_available_seats > 0:
-                bd_strs = [f"{cnt} {cls_name}" for cls_name, cnt in train.class_breakdown.items() if cnt > 0]
-                bd_summary = f"({', '.join(bd_strs)})" if bd_strs else ""
+                short_classes = []
+                for cls_k, cnt in train.class_breakdown.items():
+                    if cnt > 0:
+                        abbr = "Bus" if "business" in cls_k.lower() else ("Eko" if "ekonomi" in cls_k.lower() else "Özel")
+                        short_classes.append(f"{cnt} {abbr}")
+                bd_summary = f"({', '.join(short_classes)})" if short_classes else ""
                 seat_str = f"\033[1;32m🟢 {train.total_available_seats} Seats {bd_summary}\033[0m"
             else:
                 seat_str = "\033[1;31m🔴 Sold Out\033[0m"
 
             price_str = f" - {train.price:.0f} {train.currency}" if train.price else ""
-            option_labels.append(f"\033[1m{route_times:<14}\033[0m | {train_label:<28} | {seat_str}{price_str}")
+            option_labels.append(f"\033[1m{route_times:<14}\033[0m | {train_label:<10} | {seat_str}{price_str}")
 
         title = f"🚆 Select Trains to Track on {date_str} ({origin} ➔ {destination}):"
         chosen_indices = prompt_multi_checkbox(title, option_labels)
