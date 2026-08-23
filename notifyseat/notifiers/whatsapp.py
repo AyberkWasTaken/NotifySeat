@@ -47,11 +47,7 @@ class WhatsAppNotifier(BaseNotifier):
 
         phone = normalize_phone_number(self.config.phone_number)
 
-        text = f"🚨 *{title}*\n\n{message}"
-        if task:
-            text += f"\n\n🚆 *Route:* {task.origin} ➔ {task.destination}\n📅 *Date:* {task.display_date}"
-        if data and data.get("booking_url"):
-            text += f"\n🔗 *Book Now:* {data['booking_url']}"
+        text = message.strip()
 
         encoded_text = urllib.parse.quote_plus(text)
         url = f"https://api.callmebot.com/whatsapp.php?phone={phone}&text={encoded_text}&apikey={self.config.apikey}"

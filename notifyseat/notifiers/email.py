@@ -37,50 +37,35 @@ class EmailNotifier(BaseNotifier):
         msg["From"] = f"NotifySeat <{sender}>"
         msg["To"] = recipient
 
-        # Plain text version
-        text_content = f"{title}\n\n{message}\n"
-        if task:
-            text_content += f"\nRoute: {task.origin} -> {task.destination}\nDate: {task.display_date}\nTransport: {task.transport_type.upper()}\n"
-        if data and data.get("booking_url"):
-            text_content += f"\nBooking Link: {data['booking_url']}\n"
+        # Plain text version (clean format)
+        text_content = message.strip()
 
         # HTML version
-        booking_btn = ""
-        if data and data.get("booking_url"):
-            booking_btn = f"""
-            <div style="margin-top: 20px;">
-                <a href="{data['booking_url']}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                    Book Seats Now ➔
-                </a>
-            </div>
-            """
+        booking_url = (data and data.get("booking_url")) or "https://ebilet.tcddtasimacilik.gov.tr"
+        booking_btn = f"""
+        <div style="margin-top: 25px; text-align: center;">
+            <a href="{booking_url}" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; display: inline-block;">
+                TCDD'den Bilet Al ➔
+            </a>
+        </div>
+        """
 
-        task_info = ""
-        if task:
-            task_info = f"""
-            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-                <tr><td style="padding: 6px; color: #6b7280;">Route:</td><td style="padding: 6px; font-weight: bold;">{task.origin} ➔ {task.destination}</td></tr>
-                <tr><td style="padding: 6px; color: #6b7280;">Date:</td><td style="padding: 6px; font-weight: bold;">{task.display_date}</td></tr>
-                <tr><td style="padding: 6px; color: #6b7280;">Transport:</td><td style="padding: 6px; font-weight: bold;">{task.transport_type.upper()}</td></tr>
-            </table>
-            """
+        formatted_msg_html = message.strip().replace("\n", "<br>")
 
         html_content = f"""
         <!DOCTYPE html>
         <html>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
-            <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                <div style="background: #1e293b; color: white; padding: 20px; text-align: center;">
-                    <h1 style="margin: 0; font-size: 20px;">🚨 NotifySeat Alert</h1>
+            <div style="max-width: 520px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                <div style="background: #1e293b; color: white; padding: 18px 24px; text-align: center;">
+                    <h2 style="margin: 0; font-size: 18px;">🚨 NotifySeat İptal Bilet Bildirimi</h2>
                 </div>
-                <div style="padding: 24px;">
-                    <h2 style="color: #111827; margin-top: 0;">{title}</h2>
-                    <p style="color: #374151; font-size: 16px; line-height: 1.5;">{message}</p>
-                    {task_info}
+                <div style="padding: 24px; color: #1f2937; font-size: 15px; line-height: 1.6;">
+                    {formatted_msg_html}
                     {booking_btn}
                 </div>
                 <div style="background: #f8fafc; padding: 12px; text-align: center; color: #94a3b8; font-size: 12px;">
-                    Sent locally by NotifySeat
+                    NotifySeat Otomatik Koltuk Takip Sistemi
                 </div>
             </div>
         </body>

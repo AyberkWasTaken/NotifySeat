@@ -64,23 +64,27 @@ class TaskWorker:
         if should_notify:
             open_services = [s for s in result.services if s.total_available_seats > 0]
             first_s = open_services[0] if open_services else (result.services[0] if result.services else None)
-            
+
+            summary_lines = []
             if open_services:
-                summary_lines = []
                 for s in open_services:
-                    cls_str = ", ".join([f"{cnt} {cls}" for cls, cnt in s.class_breakdown.items() if cnt > 0])
-                    summary_lines.append(f"• {s.departure_time} ({s.service_name}): {s.total_available_seats} seat(s) [{cls_str}]")
+                    cls_parts = []
+                    for cls_name, cnt in s.class_breakdown.items():
+                        if cnt > 0:
+                            cls_parts.append(f"{cnt} {cls_name}")
+                    cls_str = ", ".join(cls_parts) if cls_parts else f"{s.total_available_seats} Koltuk"
+                    summary_lines.append(f"• {s.departure_time} ➔ {cls_str}")
                 details_text = "\n".join(summary_lines)
             else:
-                details_text = f"{new_seats} seat(s) available."
+                details_text = f"• {new_seats} Koltuk"
 
-            title = f"🎉 Seat Opening: {task.origin} ➔ {task.destination}"
+            title = f"İptal Bilet: {task.origin} ➔ {task.destination}"
             body = (
-                f"🚨 CANCELLATION DETECTED!\n"
-                f"🚆 Route: {task.origin} ➔ {task.destination}\n"
-                f"📅 Date: {task.display_date}\n\n"
-                f"💺 Available Seats:\n{details_text}\n\n"
-                f"🔗 Book Immediately: https://ebilet.tcddtasimacilik.gov.tr"
+                f"🚨 İPTAL BİLET BULUNDU!\n\n"
+                f"🚆 Güzergah: {task.origin} ➔ {task.destination}\n"
+                f"📅 Tarih: {task.display_date}\n\n"
+                f"Boş Koltuklar:\n{details_text}\n\n"
+                f"🔗 Bilet Al: https://ebilet.tcddtasimacilik.gov.tr"
             )
 
             notification_data = {
