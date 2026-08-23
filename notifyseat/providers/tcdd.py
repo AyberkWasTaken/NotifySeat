@@ -167,7 +167,7 @@ class TCDDProvider(BaseProvider):
         if result is not None:
             return result
 
-        # Honest failure when no direct route exists or API returns no services
+        # Failure when API returns no response or route not found
         return CheckResult(
             task_id=task.id,
             success=False,
@@ -176,48 +176,6 @@ class TCDDProvider(BaseProvider):
             services=[],
             message=f"No direct train services found between {origin_name} and {dest_name} on {task.date}."
         )
-
-    def _get_netscaler_cookies(self, force_refresh: bool = False) -> Dict[str, str]:
-        """Manages Citrix NetScaler session cookies to bypass WAF bot checks."""
-        import os
-        import json
-        import time
-        from pathlib import Path
-
-        session_file = Path.home() / ".notifyseat" / "netscaler_session.json"
-        if not force_refresh and session_file.exists():
-            try:
-                with open(session_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if time.time() - data.get("timestamp", 0) < 3600:
-                        return data.get("cookies", {})
-            except Exception:
-                pass
-
-        try:
-            from playwright.sync_api import sync_playwright
-            with sync_playwright() as p:
-                browser = p.chromium.launch(
-                    headless=True,
-                    args=["--no-sandbox", "--disable-blink-features=AutomationControlled"]
-                )
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    locale="tr-TR"
-                )
-                page = context.new_page()
-                page.goto(self.BOOKING_URL, wait_until="commit", timeout=15000)
-                time.sleep(2)
-                cookies = {c["name"]: c["value"] for c in context.cookies()}
-                browser.close()
-
-                session_file.parent.mkdir(parents=True, exist_ok=True)
-                with open(session_file, "w", encoding="utf-8") as f:
-                    json.dump({"timestamp": time.time(), "cookies": cookies}, f)
-                return cookies
-        except Exception as e:
-            logger.debug(f"Could not refresh NetScaler session: {e}")
-            return {}
 
     def _check_via_ytp_api(
         self,
@@ -228,37 +186,10 @@ class TCDDProvider(BaseProvider):
         dest_id: int,
         custom_token: Optional[str] = None
     ) -> Optional[CheckResult]:
-        """Calls modern YTP API with bearer authentication and NetScaler session cookies."""
-        cookies_dict = self._get_netscaler_cookies()
-        session_file = Path.home() / ".notifyseat" / "tcdd_session.json"
-        saved_session = {}
-        if session_file.exists():
-            try:
-                with open(session_file, "r", encoding="utf-8") as f:
-                    saved_session = json.load(f)
-                    if saved_session.get("cookies"):
-                        cookies_dict.update(saved_session["cookies"])
-            except Exception:
-                pass
+        """Calls modern YTP API with verified headers and parameters."""
+        import requests
 
-        cookie_header = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()]) if cookies_dict else ""
-
-        headers = {
-            "Host": "web-api-prod-ytp.tcddtasimacilik.gov.tr",
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:154.0) Gecko/20100101 Firefox/154.0",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "tr",
-            "unit-id": "3895",
-            "Content-Type": "application/json",
-            "Origin": "https://ebilet.tcddtasimacilik.gov.tr",
-            "Sec-GPC": "1",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-site"
-        }
-        if cookie_header:
-            headers["Cookie"] = cookie_header
-
+        # TCDD expects departure date formatted as (date - 1 day) 21:00:00
         try:
             d = datetime.strptime(task.date, "%Y-%m-%d") - timedelta(days=1)
             dep_date_str = d.strftime("%d-%m-%Y 21:00:00")
@@ -280,7 +211,10 @@ class TCDDProvider(BaseProvider):
                     "id": 0,
                     "count": task.min_seats or 1
                 }
-            ]
+            ],
+            "searchReservation": False,
+            "searchType": "DOMESTIC",
+            "blTrainTypes": ["TURISTIK_TREN"]
         }
 
         tokens_to_try = []
@@ -294,27 +228,35 @@ class TCDDProvider(BaseProvider):
             "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/train/train-availability"
         ]
 
-        import requests
-
         for token in tokens_to_try:
-            headers["Authorization"] = token
+            headers = {
+                "Host": "web-api-prod-ytp.tcddtasimacilik.gov.tr",
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:154.0) Gecko/20100101 Firefox/154.0",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "tr",
+                "Authorization": token,
+                "Content-Type": "application/json",
+                "Origin": "https://ebilet.tcddtasimacilik.gov.tr",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-site",
+                "Sec-GPC": "1",
+                "unit-id": "3895"
+            }
+
             for endpoint in endpoints:
                 try:
-                    r = requests.post(endpoint, json=payload, headers=headers, timeout=10)
+                    r = requests.post(endpoint, json=payload, headers=headers, timeout=25)
                     if r.status_code == 200:
                         data = r.json()
                         if isinstance(data, (list, dict)) and data:
                             parsed = self._parse_ytp_response(task, data, origin_name, dest_name)
-                            if parsed and parsed.services:
+                            if parsed is not None:
                                 return parsed
                 except Exception as e:
                     logger.debug(f"YTP API probe error on {endpoint}: {e}")
                     continue
 
-        return None
-
-    def _check_via_playwright(self, task: TrackingTask, origin_name: str, dest_name: str) -> Optional[CheckResult]:
-        """Automates headless browser session to check exact trip availability."""
         return None
 
     def _parse_ytp_response(self, task: TrackingTask, data: Any, origin_name: str, dest_name: str) -> CheckResult:
