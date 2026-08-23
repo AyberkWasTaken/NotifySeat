@@ -167,14 +167,14 @@ class TCDDProvider(BaseProvider):
         if result is not None:
             return result
 
-        # Honest failure when TCDD API is blocked by WAF or no direct route exists
+        # Honest failure when no direct route exists or API returns no services
         return CheckResult(
             task_id=task.id,
             success=False,
             found=False,
             seats_count=0,
             services=[],
-            message=f"No direct trains found or TCDD API authorization required for {origin_name} ➔ {dest_name}. Please configure your TCDD session token via 'notifyseat config'."
+            message=f"No direct train services found between {origin_name} and {dest_name} on {task.date}."
         )
 
     def _get_netscaler_cookies(self, force_refresh: bool = False) -> Dict[str, str]:

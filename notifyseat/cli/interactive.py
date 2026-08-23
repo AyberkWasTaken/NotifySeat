@@ -191,12 +191,10 @@ def interactive_config(config_mgr):
 
     wa_status = f"🟢 ENABLED ({cfg.whatsapp.phone_number})" if cfg.whatsapp.enabled and cfg.whatsapp.phone_number else "⚪ DISABLED"
     em_status = f"🟢 ENABLED ({cfg.email.recipient_email})" if cfg.email.enabled and cfg.email.recipient_email else "⚪ DISABLED"
-    tcdd_status = "🟢 CONFIGURED" if cfg.tcdd_token else "⚪ DEFAULT"
 
     options = [
         f"📱 Configure WhatsApp (Direct WhatsApp alerts to your phone) [{wa_status}]",
         f"📧 Configure Email (Gmail / Outlook / Custom SMTP) [{em_status}]",
-        f"🎫 Configure TCDD Session Token (For Direct Backend Access) [{tcdd_status}]",
         "⚡ Test All Configured Notification Channels",
         "🚪 Exit Setup"
     ]
@@ -324,20 +322,6 @@ def interactive_config(config_mgr):
             print("\n\033[1;32m✔ Custom SMTP configuration saved!\033[0m")
 
     elif choice == 2:
-        # TCDD Token Setup
-        print("\n\033[1;32m--- 🎫 TCDD Session Token Setup ---\033[0m\n")
-        print("To query TCDD's official booking backend directly, you can provide an active Bearer Token:")
-        print("  • From browser: Open ebilet.tcddtasimacilik.gov.tr ➔ DevTools (F12) ➔ Application ➔ LocalStorage ➔ AUTH_TOKEN")
-        print("  • Or copy the Authorization Bearer header from network requests.\n")
-        new_token = prompt_text("Enter TCDD Bearer Token (or press enter to keep current):", default=cfg.tcdd_token or "").strip()
-        if new_token:
-            cfg.tcdd_token = new_token
-            config_mgr.save(cfg)
-            print("\n\033[1;32m✔ TCDD session token saved to configuration!\033[0m\n")
-        else:
-            print("\nKept current token setting.\n")
-
-    elif choice == 3:
         from notifyseat.notifiers.manager import NotificationManager
         mgr = NotificationManager(cfg)
         print("\n⏳ Testing all active notification channels...")
