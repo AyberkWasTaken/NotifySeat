@@ -479,14 +479,33 @@ class TCDDProvider(BaseProvider):
             message=msg
         )
 
+    def get_scheduled_trains(self, origin: str, destination: str, date: str) -> List[ServiceInfo]:
+        """Fetches all scheduled train services for a given route and date."""
+        temp_task = TrackingTask(
+            origin=origin,
+            destination=destination,
+            date=date,
+            time_filter=None,
+            min_seats=1
+        )
+        res = self.check_route(temp_task)
+        if res and res.services:
+            return sorted(res.services, key=lambda s: s.departure_time or "")
+        return []
+
     def _match_time_filter(self, dep_time: str, filter_str: str) -> bool:
         if not dep_time or not filter_str:
             return True
         filter_str = filter_str.strip()
-        
+
+        # Comma-separated exact times or list, e.g. "05:30, 07:20, 11:10"
+        if "," in filter_str:
+            times = [t.strip() for t in filter_str.split(",") if t.strip()]
+            return any(t == dep_time or t in dep_time for t in times)
+
         # Exact hour match e.g. "16:35"
         if ":" in filter_str and "-" not in filter_str:
-            return filter_str in dep_time
+            return filter_str == dep_time or filter_str in dep_time
 
         # Range match e.g. "08:00-14:00"
         if "-" in filter_str:

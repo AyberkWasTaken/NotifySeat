@@ -92,11 +92,96 @@ def prompt_station(prompt: str) -> str:
             raise KeyboardInterrupt
 
 
-def interactive_create_task() -> Optional[TrackingTask]:
-    """Guides the user through creating a new TCDD route tracking task."""
+def prompt_multi_checkbox(title: str, options: List[str], initial_selected: Optional[List[bool]] = None) -> List[int]:
+    """
+    Renders an interactive terminal multi-select menu with checkbox toggles.
+    Controls: Up/Down arrows (or j/k) to navigate, Space to toggle, 'a' for all, Enter to submit.
+    """
+    import sys
+    import tty
+    import termios
+
+    if not sys.stdin.isatty() or len(options) == 0:
+        return list(range(len(options)))
+
+    selected = list(initial_selected) if initial_selected else [True] * len(options)
+    cursor = 0
+    num_opts = len(options)
+
+    # Hide cursor
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
+
+    def render(first_render=False):
+        if not first_render:
+            sys.stdout.write(f"\033[{num_opts}A")
+        
+        for idx in range(num_opts):
+            is_active = (idx == cursor)
+            is_checked = selected[idx]
+            
+            ptr = "\033[1;36m❯\033[0m " if is_active else "  "
+            chk = "\033[1;32m[✔]\033[0m" if is_checked else "\033[1;30m[ ]\033[0m"
+            text = options[idx]
+            
+            sys.stdout.write(f"\r\033[K{ptr}{chk} {text}\n")
+        sys.stdout.flush()
+
+    print(f"\n\033[1;36m{title}\033[0m")
+    print("\033[1;30m  (Controls: ↑/↓ to move, Space to toggle, 'a' for all/none, Enter to confirm)\033[0m\n")
+    
+    render(first_render=True)
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+
+    try:
+        tty.setraw(fd)
+        while True:
+            char = sys.stdin.read(1)
+            if char == '\x1b':  # Escape sequence (e.g. arrow keys)
+                seq = sys.stdin.read(2)
+                if seq == '[A':  # Up arrow
+                    cursor = (cursor - 1) % num_opts
+                    render()
+                elif seq == '[B':  # Down arrow
+                    cursor = (cursor + 1) % num_opts
+                    render()
+            elif char in ('k', 'K'):  # Vim up
+                cursor = (cursor - 1) % num_opts
+                render()
+            elif char in ('j', 'J'):  # Vim down
+                cursor = (cursor + 1) % num_opts
+                render()
+            elif char == ' ':  # Toggle space
+                selected[cursor] = not selected[cursor]
+                render()
+            elif char in ('a', 'A'):  # Toggle all
+                all_checked = all(selected)
+                selected = [not all_checked] * num_opts
+                render()
+            elif char in ('\r', '\n'):  # Enter confirm
+                break
+            elif char == '\x03':  # Ctrl+C
+                raise KeyboardInterrupt
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        # Restore cursor
+        sys.stdout.write("\033[?25h\n")
+        sys.stdout.flush()
+
+    return [i for i, s in enumerate(selected) if s]
+
+
+def print_wizard_header():
     print("\n" + "=" * 55)
     print("       🚀 \033[1;32mNOTIFYSEAT - NEW TCDD TRAIN TRACKER\033[0m")
     print("=" * 55)
+
+
+def interactive_create_task() -> Optional[TrackingTask]:
+    """Guides the user through an interactive setup wizard to configure a route tracker."""
+    print_wizard_header()
 
     print("\n\033[1;36m📌 Major Stations & Cities:\033[0m")
     print("  • \033[1;37mİstanbul\033[0m (Söğütlüçeşme, Halkalı, Pendik, Bostancı, Bakırköy)")
@@ -122,24 +207,58 @@ def interactive_create_task() -> Optional[TrackingTask]:
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y")
     date_str = prompt_text("Enter Travel Date (DD-MM-YYYY)", default=tomorrow)
 
-    # Time Filter
-    time_choices = [
-        "Any Time (Check all journeys of the day)",
-        "Morning (05:00 - 12:00)",
-        "Afternoon (12:00 - 18:00)",
-        "Evening (18:00 - 24:00)",
-        "Specific Time (e.g. 08:30)"
-    ]
-    tm_idx = prompt_choice("Preferred Departure Time Window:", time_choices, default_idx=0)
+    # Live Train Fetching & Interactive Checkbox Selection
+    print(f"\n🔍 Querying scheduled train services for {date_str} from TCDD...")
+    scheduled_trains = provider.get_scheduled_trains(origin, destination, date_str)
+
     time_filter = None
-    if tm_idx == 1:
-        time_filter = "morning"
-    elif tm_idx == 2:
-        time_filter = "afternoon"
-    elif tm_idx == 3:
-        time_filter = "evening"
-    elif tm_idx == 4:
-        time_filter = prompt_text("Enter specific departure hour (HH:MM)", default="08:30")
+    if scheduled_trains:
+        option_labels = []
+        for train in scheduled_trains:
+            dep = train.departure_time or "??"
+            arr = train.arrival_time or ""
+            route_times = f"{dep} ➔ {arr}" if arr else dep
+            train_label = train.service_name or f"Train {train.service_id}"
+
+            if train.total_available_seats > 0:
+                bd_strs = [f"{cnt} {cls_name}" for cls_name, cnt in train.class_breakdown.items() if cnt > 0]
+                bd_summary = f"({', '.join(bd_strs)})" if bd_strs else ""
+                seat_str = f"\033[1;32m🟢 {train.total_available_seats} Seats {bd_summary}\033[0m"
+            else:
+                seat_str = "\033[1;31m🔴 Sold Out\033[0m"
+
+            price_str = f" - {train.price:.0f} {train.currency}" if train.price else ""
+            option_labels.append(f"\033[1m{route_times:<14}\033[0m | {train_label:<28} | {seat_str}{price_str}")
+
+        title = f"🚆 Select Trains to Track on {date_str} ({origin} ➔ {destination}):"
+        chosen_indices = prompt_multi_checkbox(title, option_labels)
+
+        if not chosen_indices or len(chosen_indices) == len(scheduled_trains):
+            time_filter = None
+            selected_summary = "All Scheduled Trains"
+        else:
+            chosen_trains = [scheduled_trains[i] for i in chosen_indices]
+            time_filter = ", ".join([t.departure_time for t in chosen_trains if t.departure_time])
+            selected_summary = f"{len(chosen_trains)} Train(s) ({time_filter})"
+    else:
+        print("\n\033[1;33m⚠️ Could not retrieve live timetable. Fallback to manual window:\033[0m")
+        time_choices = [
+            "Any Time (Check all journeys of the day)",
+            "Morning (05:00 - 12:00)",
+            "Afternoon (12:00 - 18:00)",
+            "Evening (18:00 - 24:00)",
+            "Specific Time (e.g. 08:30)"
+        ]
+        tm_idx = prompt_choice("Preferred Departure Time Window:", time_choices, default_idx=0)
+        if tm_idx == 1:
+            time_filter = "morning"
+        elif tm_idx == 2:
+            time_filter = "afternoon"
+        elif tm_idx == 3:
+            time_filter = "evening"
+        elif tm_idx == 4:
+            time_filter = prompt_text("Enter specific departure hour (HH:MM)", default="08:30")
+        selected_summary = time_filter.title() if time_filter else "All Day"
 
     task = TrackingTask(
         transport_type=TransportType.TCDD,
@@ -155,7 +274,7 @@ def interactive_create_task() -> Optional[TrackingTask]:
     print("\n\033[1;32m✔ Route tracker configured successfully!\033[0m")
     print(f"  • Route: {task.origin} ➔ {task.destination}")
     print(f"  • Date: {task.display_date}")
-    print(f"  • Window: {task.time_filter.title() if task.time_filter else 'All Day'}")
+    print(f"  • Window / Trains: {selected_summary}")
     print(f"  • Radar: Checks every 5 minutes for cancellations\n")
     return task
 
