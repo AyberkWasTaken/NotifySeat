@@ -19,8 +19,15 @@ from notifyseat.providers.tcdd import TCDD_STATIONS, normalize_tr
 
 class StationTabCompleter:
     """Provides smart prefix-prioritized TAB autocompletion for train stations."""
-    def __init__(self, candidates: List[str]):
-        self.candidates = candidates
+    def __init__(self, candidates: List[Any]):
+        self.station_names = []
+        for c in candidates:
+            if isinstance(c, dict):
+                name = c.get("name", "")
+                if name:
+                    self.station_names.append(name)
+            elif isinstance(c, str):
+                self.station_names.append(c)
         self.matches = []
 
     def complete(self, text: str, state: int):
@@ -30,14 +37,14 @@ class StationTabCompleter:
                 starts_with = []
                 word_starts = []
                 contains = []
-                for c in self.candidates:
-                    c_norm = normalize_tr(c)
-                    if c_norm.startswith(q_norm):
-                        starts_with.append(c)
-                    elif any(normalize_tr(w).startswith(q_norm) for w in c.replace("(", " ").replace(")", " ").split()):
-                        word_starts.append(c)
-                    elif q_norm in c_norm:
-                        contains.append(c)
+                for name in self.station_names:
+                    n_norm = normalize_tr(name)
+                    if n_norm.startswith(q_norm):
+                        starts_with.append(name)
+                    elif any(normalize_tr(w).startswith(q_norm) for w in name.replace("(", " ").replace(")", " ").split()):
+                        word_starts.append(name)
+                    elif q_norm in n_norm:
+                        contains.append(name)
                 
                 # Combine distinct matches in ranked order
                 seen = set()
@@ -47,7 +54,7 @@ class StationTabCompleter:
                         seen.add(item)
                         self.matches.append(item)
             else:
-                self.matches = self.candidates[:]
+                self.matches = self.station_names[:]
         try:
             return self.matches[state]
         except IndexError:
@@ -95,6 +102,9 @@ def prompt_station(prompt: str) -> str:
         try:
             completer = StationTabCompleter(TCDD_STATIONS)
             readline.set_completer(completer.complete)
+            readline.set_completer_delims("")
+            readline.parse_and_bind("set completion-ignore-case on")
+            readline.parse_and_bind("set show-all-if-ambiguous on")
             readline.parse_and_bind("tab: complete")
         except Exception:
             pass
