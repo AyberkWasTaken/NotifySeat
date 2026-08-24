@@ -442,7 +442,7 @@ def interactive_config(config_mgr):
 
         phone_raw = prompt_text("Enter your WhatsApp Phone Number (e.g. 05051234567 or +905051234567):", default=cfg.whatsapp.phone_number or "")
         phone = normalize_phone_number(phone_raw)
-        apikey = prompt_text("Enter the API Key sent to you by CallMeBot (e.g. 1897404):", default=cfg.whatsapp.apikey)
+        apikey = prompt_text("Enter the API Key sent to you by CallMeBot (e.g. 1234567):", default=cfg.whatsapp.apikey)
 
         if phone and apikey:
             cfg.whatsapp.phone_number = phone
