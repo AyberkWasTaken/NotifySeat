@@ -117,11 +117,10 @@ def render_track_check_table(task: TrackingTask, result):
         f"[bold cyan]🚆 Route:[/bold cyan] [bold white]{task.origin} ➔ {task.destination}[/bold white]   "
         f"[bold cyan]📅 Date:[/bold cyan] [bold yellow]{task.display_date}[/bold yellow]   "
         f"[bold cyan]🕒 Window:[/bold cyan] [bold green]{window_label}[/bold green]   "
-        f"[bold cyan]⏱️ Check Time:[/bold cyan] [bold yellow]{time_stamp}[/bold yellow]   "
         f"[bold cyan]🆔 ID:[/bold cyan] [dim]{task.id}[/dim]"
     )
     if HAS_RICH and console:
-        console.print()
+        console.print(f"\n[bold yellow][{time_stamp}][/bold yellow]")
         console.print(Panel(title_text, expand=True, border_style="cyan"))
 
         if result.services:
@@ -174,7 +173,7 @@ def render_track_check_table(task: TrackingTask, result):
             else:
                 console.print(f"[yellow]● Status: Sold Out. Monitoring...[/yellow]\n")
     else:
-        print(f"\n--- [{task.origin} -> {task.destination} ({task.display_date}) | ⏱️ {time_stamp}] ---")
+        print(f"\n[{time_stamp}] --- [{task.origin} -> {task.destination} ({task.display_date})] ---")
         print(f"Seats: {result.seats_count} | Found: {result.found}")
 
 
