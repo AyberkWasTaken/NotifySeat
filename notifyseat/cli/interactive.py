@@ -2,7 +2,7 @@
 import os
 import sys
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 
 try:
     import readline
