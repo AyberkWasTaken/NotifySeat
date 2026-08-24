@@ -180,7 +180,7 @@ class TCDDProvider(BaseProvider):
             found=False,
             seats_count=0,
             services=[],
-            message=f"No direct train services found between {origin_name} and {dest_name} on {task.date}."
+            message=f"No direct train services found between {origin_name} and {dest_name} on {task.display_date}."
         )
 
     def _check_via_ytp_api(
@@ -195,12 +195,19 @@ class TCDDProvider(BaseProvider):
         """Calls modern YTP API with verified headers and parameters."""
         import requests
 
-        # TCDD expects departure date formatted as (date - 1 day) 21:00:00
-        try:
-            d = datetime.strptime(task.date, "%Y-%m-%d") - timedelta(days=1)
-            dep_date_str = d.strftime("%d-%m-%Y 21:00:00")
-        except Exception:
-            dep_date_str = task.date
+        # TCDD expects departure date formatted as (travel_date - 1 day) 21:00:00
+        dep_date_str = None
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%Y"):
+            try:
+                parsed_d = datetime.strptime(str(task.date).strip(), fmt)
+                offset_d = parsed_d - timedelta(days=1)
+                dep_date_str = offset_d.strftime("%d-%m-%Y 21:00:00")
+                break
+            except Exception:
+                pass
+
+        if not dep_date_str:
+            dep_date_str = str(task.date)
 
         payload = {
             "searchRoutes": [
@@ -469,12 +476,12 @@ class TCDDProvider(BaseProvider):
                 trip_descriptions.append(f"found {s.total_available_seats} empty seats on {s.departure_time} route ({breakdown})")
             
             detail_msg = "; ".join(trip_descriptions)
-            msg = f"🎉 {detail_msg} from {origin_name} to {dest_name} on {task.date}."
+            msg = f"🎉 {detail_msg} from {origin_name} to {dest_name} on {task.display_date}."
         else:
             if checked_trains_summary:
-                msg = f"Checked {len(checked_trains_summary)} trains on {task.date} [{', '.join(checked_trains_summary[:4])}]: All Sold Out (0 seats). Monitoring for cancellations..."
+                msg = f"Checked {len(checked_trains_summary)} trains on {task.display_date} [{', '.join(checked_trains_summary[:4])}]: All Sold Out (0 seats). Monitoring for cancellations..."
             else:
-                msg = f"No scheduled trains found between {origin_name} and {dest_name} on {task.date}."
+                msg = f"No scheduled trains found between {origin_name} and {dest_name} on {task.display_date}."
 
         return CheckResult(
             task_id=task.id,
