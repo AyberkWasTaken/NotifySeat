@@ -112,10 +112,12 @@ def cmd_track(db: Database, args: argparse.Namespace):
 
 def render_track_check_table(task: TrackingTask, result):
     window_label = task.time_filter.title() if task.time_filter else "All Day"
+    time_stamp = datetime.now().strftime("%H:%M:%S")
     title_text = (
         f"[bold cyan]🚆 Route:[/bold cyan] [bold white]{task.origin} ➔ {task.destination}[/bold white]   "
         f"[bold cyan]📅 Date:[/bold cyan] [bold yellow]{task.display_date}[/bold yellow]   "
         f"[bold cyan]🕒 Window:[/bold cyan] [bold green]{window_label}[/bold green]   "
+        f"[bold cyan]⏱️ Check Time:[/bold cyan] [bold yellow]{time_stamp}[/bold yellow]   "
         f"[bold cyan]🆔 ID:[/bold cyan] [dim]{task.id}[/dim]"
     )
     if HAS_RICH and console:
@@ -172,7 +174,7 @@ def render_track_check_table(task: TrackingTask, result):
             else:
                 console.print(f"[yellow]● Status: Sold Out. Monitoring...[/yellow]\n")
     else:
-        print(f"\n--- [{task.origin} -> {task.destination} ({task.date})] ---")
+        print(f"\n--- [{task.origin} -> {task.destination} ({task.display_date}) | ⏱️ {time_stamp}] ---")
         print(f"Seats: {result.seats_count} | Found: {result.found}")
 
 
