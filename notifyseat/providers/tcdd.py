@@ -313,11 +313,18 @@ class TCDDProvider(BaseProvider):
                         if task.time_filter and not self._match_time_filter(dep_time, task.time_filter):
                             continue
 
-                        # Check if train is sold out via minPrice
+                        # Extract minPrice (base fare or cabin fare)
                         min_price_obj = train.get("minPrice") or {}
                         price_amount = float(min_price_obj.get("priceAmount", 0.0) or 0.0)
-                        price_currency = min_price_obj.get("priceCurrency")
-                        is_train_sold_out = (price_amount <= 0 or price_currency is None)
+                        price_currency = min_price_obj.get("priceCurrency") or "TRY"
+
+                        # Fallback to fare info if minPrice is not present at train level
+                        if price_amount <= 0:
+                            for fare in train.get("availableFareInfo", []):
+                                p = float(fare.get("fare", 0.0) or 0.0)
+                                if p > 0:
+                                    price_amount = p
+                                    break
 
                         # Extract exact available seats per class from availableFareInfo or cabinClassAvailabilities
                         class_breakdown = {}

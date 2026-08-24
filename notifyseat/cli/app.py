@@ -145,16 +145,17 @@ def render_track_check_table(task: TrackingTask, result):
                 bus_cnt = bd.get("Business", 0)
                 eko_cnt = bd.get("Ekonomi", 0)
 
+                price_str = f"{price:.0f} {curr}" if price else "-"
                 if seats > 0:
                     status_cell = f"[bold green]🟢 {seats} Seat{'s' if seats > 1 else ''}[/bold green]"
                     bus_cell = f"[green]{bus_cnt}[/green]" if bus_cnt > 0 else "[dim]0[/dim]"
                     eko_cell = f"[bold green]{eko_cnt}[/bold green]" if eko_cnt > 0 else "[dim]0[/dim]"
-                    price_cell = f"{price:.0f} {curr}" if price else "-"
+                    price_cell = f"[bold green]{price_str}[/bold green]" if price else "[dim]-[/dim]"
                 else:
                     status_cell = "[bold red]🔴 Sold Out[/bold red]"
                     bus_cell = "[dim red]0[/dim red]"
                     eko_cell = "[dim red]0[/dim red]"
-                    price_cell = "[dim]-[/dim]"
+                    price_cell = f"[cyan]{price_str}[/cyan]" if price else "[dim]-[/dim]"
 
                 table.add_row(dep_str, train_no, status_cell, bus_cell, eko_cell, price_cell)
 
