@@ -332,13 +332,13 @@ def prompt_calendar_date(title: str = "Select Travel Date", default_date: Option
         lines.append("\033[1;30m  (←/→: Day, ↑/↓: Week, [/]: Month, Enter: Confirm)\033[0m")
         m_str = f"{TURKISH_MONTHS[curr_date.month]} {curr_date.year}"
         lines.append(f"        \033[1;36m◀   {m_str:^14}   ▶\033[0m")
-        lines.append("  \033[1;34mPzt   Sal   Çar   Per   Cum   Cmt   Paz\033[0m")
+        lines.append("  \033[1;34m Pzt   Sal   Çar   Per   Cum   Cmt   Paz\033[0m")
 
         for w in weeks:
             w_strs = []
             for day_num in w:
                 if day_num == 0:
-                    w_strs.append("     ")
+                    w_strs.append("    ")
                 else:
                     d = date(curr_date.year, curr_date.month, day_num)
                     if d == curr_date:
