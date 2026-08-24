@@ -227,14 +227,15 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
     print("Press Ctrl+C at any time to exit gracefully.\n")
 
     def on_event(event_type: str, data: dict):
-        if event_type in ("engine_started", "engine_stopped"):
+        # Ignore lifecycle and pre-check events to avoid premature/misleading terminal logs
+        if event_type in ("engine_started", "engine_stopped", "task_checking"):
             return
         task_obj = data.get("task")
         result_obj = data.get("result")
         
         if task_obj and result_obj:
             render_track_check_table(task_obj, result_obj)
-        elif data.get("name"):
+        elif data.get("name") and event_type in ("task_checked", "seats_found"):
             ts = datetime.now().strftime("%H:%M:%S")
             msg = data.get("message") or f"Checked {data.get('name')}: {data.get('seats', 0)} seats."
             print(f"[{ts}] {msg}")

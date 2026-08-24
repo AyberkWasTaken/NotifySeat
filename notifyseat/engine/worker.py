@@ -25,9 +25,6 @@ class TaskWorker:
         """Runs check for task, handles seat state changes, and sends alerts only on 0 -> >0 seat transitions."""
         provider = registry.get(task.transport_type)
         
-        # Emit checking event
-        self._emit_event("task_checking", {"task_id": task.id, "name": task.name})
-
         # Run provider check
         result: CheckResult = provider.check_route(task)
         now_str = datetime.now().isoformat()
