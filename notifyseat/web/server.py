@@ -280,6 +280,37 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
 
 
+def open_browser_quietly(url: str):
+    """Opens a URL in default browser with subprocess stdout/stderr detached to prevent sandbox terminal logs."""
+    import subprocess
+    import shutil
+    import sys
+    try:
+        if sys.platform.startswith("linux") and shutil.which("xdg-open"):
+            subprocess.Popen(
+                ["xdg-open", url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+        elif sys.platform == "darwin":
+            subprocess.Popen(
+                ["open", url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+        else:
+            import webbrowser
+            webbrowser.open(url)
+    except Exception:
+        try:
+            import webbrowser
+            webbrowser.open(url)
+        except Exception:
+            pass
+
+
 def run_web_server(host: str = "127.0.0.1", port: int = 8080, auto_open: bool = True):
     """Starts the local Web GUI server and scheduler."""
     db = Database()
@@ -312,10 +343,7 @@ def run_web_server(host: str = "127.0.0.1", port: int = 8080, auto_open: bool = 
     print(f"========================================================\n")
 
     if auto_open:
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
+        open_browser_quietly(url)
 
     try:
         httpd.serve_forever()
