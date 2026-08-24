@@ -473,7 +473,7 @@ def interactive_create_task() -> Optional[TrackingTask]:
                 short_classes = []
                 for cls_k, cnt in train.class_breakdown.items():
                     if cnt > 0:
-                        abbr = "Bus" if "business" in cls_k.lower() else ("Eko" if "ekonomi" in cls_k.lower() else "Özel")
+                        abbr = "Bus" if "business" in cls_k.lower() else "Eko"
                         short_classes.append(f"{cnt} {abbr}")
                 bd_summary = f"({', '.join(short_classes)})" if short_classes else ""
                 seat_str = f"\033[1;32m🟢 {train.total_available_seats} Seats {bd_summary}\033[0m"

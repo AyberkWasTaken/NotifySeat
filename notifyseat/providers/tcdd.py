@@ -333,14 +333,9 @@ class TCDDProvider(BaseProvider):
                                         c_name = "Business"
                                     elif "EKONOMİ" in c_name_upper or "EKONOMI" in c_name_upper or "PULMAN" in c_name_upper:
                                         c_name = "Ekonomi"
-                                    elif "LOCA" in c_name_upper:
-                                        c_name = "Loca"
-                                    elif "YATAKLI" in c_name_upper:
-                                        c_name = "Yataklı"
-                                    elif "SANDALYE" in c_name_upper or "ENGELLİ" in c_name_upper or "ENGELLI" in c_name_upper:
-                                        c_name = "Özel / Engelli"
                                     else:
-                                        c_name = c_name_raw or "Diğer"
+                                        # Only Business and Ekonomi are considered per Ayberk's requirement
+                                        continue
 
                                     count = int(c_info.get("availabilityCount", 0) or 0)
                                     if count > 0:
@@ -357,14 +352,9 @@ class TCDDProvider(BaseProvider):
                                     c_name = "Business"
                                 elif "EKONOMİ" in c_name_upper or "EKONOMI" in c_name_upper or "PULMAN" in c_name_upper:
                                     c_name = "Ekonomi"
-                                elif "LOCA" in c_name_upper:
-                                    c_name = "Loca"
-                                elif "YATAKLI" in c_name_upper:
-                                    c_name = "Yataklı"
-                                elif "SANDALYE" in c_name_upper or "ENGELLİ" in c_name_upper or "ENGELLI" in c_name_upper:
-                                    c_name = "Özel / Engelli"
                                 else:
-                                    c_name = c_name_raw or "Diğer"
+                                    # Only Business and Ekonomi are considered per Ayberk's requirement
+                                    continue
 
                                 count = int(c_info.get("availabilityCount", 0) or 0)
                                 if count > 0:
