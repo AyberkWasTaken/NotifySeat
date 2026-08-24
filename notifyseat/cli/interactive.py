@@ -1,7 +1,8 @@
 """Interactive Terminal Wizard for NotifySeat."""
 import os
 import sys
-from datetime import datetime, timedelta
+import calendar
+from datetime import datetime, timedelta, date
 from typing import Optional, List, Any, Dict
 
 try:
@@ -271,6 +272,156 @@ def prompt_multi_checkbox(title: str, options: List[str], initial_selected: Opti
     return [i for i, s in enumerate(selected) if s]
 
 
+def prompt_calendar_date(title: str = "Select Travel Date", default_date: Optional[date] = None) -> str:
+    """
+    Renders an interactive terminal visual calendar picker with arrow key navigation.
+    Controls:
+      ← / → : previous / next day
+      ↑ / ↓ : previous / next week (+- 7 days)
+      [ / ] or < / > : previous / next month
+      Enter : confirm selected date
+      t / T : jump to tomorrow
+    """
+    today = datetime.now().date()
+    max_date = today + timedelta(days=120)
+
+    if default_date:
+        curr_date = default_date if isinstance(default_date, date) else default_date.date()
+    else:
+        curr_date = today + timedelta(days=1)
+
+    if not sys.stdin.isatty():
+        return curr_date.strftime("%d-%m-%Y")
+
+    TURKISH_MONTHS = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+    TURKISH_DAY_NAMES = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+
+    def _add_month(d: date, delta: int) -> date:
+        year = d.year
+        month = d.month + delta
+        while month > 12:
+            month -= 12
+            year += 1
+        while month < 1:
+            month += 12
+            year -= 1
+        max_days = calendar.monthrange(year, month)[1]
+        day = min(d.day, max_days)
+        new_d = date(year, month, day)
+        if new_d < today:
+            return today
+        if new_d > max_date:
+            return max_date
+        return new_d
+
+    # Total fixed lines rendered: 10
+    total_render_lines = 10
+
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
+
+    def render(first_render=False):
+        if not first_render:
+            sys.stdout.write(f"\033[{total_render_lines}A")
+
+        weeks = calendar.monthcalendar(curr_date.year, curr_date.month)
+        while len(weeks) < 6:
+            weeks.append([0] * 7)
+
+        lines = []
+        lines.append("\033[1;30m  (←/→: Day, ↑/↓: Week, [/]: Month, Enter: Confirm)\033[0m")
+        m_str = f"{TURKISH_MONTHS[curr_date.month]} {curr_date.year}"
+        lines.append(f"        \033[1;36m◀   {m_str:^14}   ▶\033[0m")
+        lines.append("  \033[1;34mPzt   Sal   Çar   Per   Cum   Cmt   Paz\033[0m")
+
+        for w in weeks:
+            w_strs = []
+            for day_num in w:
+                if day_num == 0:
+                    w_strs.append("     ")
+                else:
+                    d = date(curr_date.year, curr_date.month, day_num)
+                    if d == curr_date:
+                        w_strs.append(f"\033[1;30;46m {day_num:02d} \033[0m")
+                    elif d < today:
+                        w_strs.append(f"\033[1;30m {day_num:02d} \033[0m")
+                    elif d == today:
+                        w_strs.append(f"\033[1;33m {day_num:02d} \033[0m")
+                    else:
+                        w_strs.append(f"\033[1;37m {day_num:02d} \033[0m")
+            lines.append("  " + "  ".join(w_strs))
+
+        day_name = TURKISH_DAY_NAMES[curr_date.weekday()]
+        diff = (curr_date - today).days
+        diff_str = "Bugün" if diff == 0 else ("Yarın" if diff == 1 else f"{diff} gün sonra")
+        formatted_d = curr_date.strftime("%d-%m-%Y")
+        lines.append(f"  ❯ \033[1;32mSeçilen Tarih:\033[0m \033[1;37m{formatted_d}\033[0m \033[1;30m({day_name} - {diff_str})\033[0m")
+
+        output = "\n".join(["\r\033[K" + line for line in lines]) + "\n"
+        sys.stdout.write(output)
+        sys.stdout.flush()
+
+    print(f"\n\033[1;36m📅 {title}:\033[0m")
+    render(first_render=True)
+
+    if os.name == 'nt':
+        os.system('')
+        fd = None
+        old_settings = None
+    else:
+        import tty
+        import termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        tty.setraw(fd)
+
+    try:
+        while True:
+            key = _read_key_cross_platform()
+            if key == 'LEFT':
+                new_d = curr_date - timedelta(days=1)
+                if new_d >= today:
+                    curr_date = new_d
+                    render()
+            elif key == 'RIGHT':
+                new_d = curr_date + timedelta(days=1)
+                if new_d <= max_date:
+                    curr_date = new_d
+                    render()
+            elif key == 'UP':
+                new_d = curr_date - timedelta(days=7)
+                if new_d >= today:
+                    curr_date = new_d
+                    render()
+            elif key == 'DOWN':
+                new_d = curr_date + timedelta(days=7)
+                if new_d <= max_date:
+                    curr_date = new_d
+                    render()
+            elif key in ('[', '<', 'p', 'P'):
+                curr_date = _add_month(curr_date, -1)
+                render()
+            elif key in (']', '>', 'n', 'N'):
+                curr_date = _add_month(curr_date, 1)
+                render()
+            elif key in ('t', 'T'):
+                curr_date = today + timedelta(days=1)
+                render()
+            elif key == 'ENTER':
+                break
+    finally:
+        if old_settings is not None and fd is not None:
+            import termios
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+
+    formatted_result = curr_date.strftime("%d-%m-%Y")
+    day_name = TURKISH_DAY_NAMES[curr_date.weekday()]
+    print(f"\r\033[K✔ Selected Travel Date: \033[1;32m{formatted_result}\033[0m \033[1;30m({day_name})\033[0m")
+    return formatted_result
+
+
 def print_wizard_header():
     print("\n" + "=" * 55)
     print("       🚀 \033[1;32mNOTIFYSEAT - NEW TCDD TRAIN TRACKER\033[0m")
@@ -299,11 +450,10 @@ def interactive_create_task() -> Optional[TrackingTask]:
     origin = res_orig["name"] if res_orig else raw_origin
     destination = res_dest["name"] if res_dest else raw_dest
 
-    print(f"\n✔ Selected Route: \033[1;32m{origin} ➔ {destination}\033[0m\n")
+    print(f"\n✔ Selected Route: \033[1;32m{origin} ➔ {destination}\033[0m")
 
-    # Date
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y")
-    date_str = prompt_text("Enter Travel Date (DD-MM-YYYY)", default=tomorrow)
+    # Interactive Visual Calendar Date Picker
+    date_str = prompt_calendar_date("Select Travel Date")
 
     # Live Train Fetching & Interactive Checkbox Selection
     print(f"\n🔍 Querying scheduled train services for {date_str} from TCDD...")
