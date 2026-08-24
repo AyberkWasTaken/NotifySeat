@@ -160,16 +160,16 @@ class NotifySeatHTTPHandler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/config":
             current_cfg = self.config_mgr.get().to_dict()
+            if "whatsapp" in body:
+                current_cfg["whatsapp"].update(body["whatsapp"])
+            if "email" in body:
+                current_cfg["email"].update(body["email"])
+            if "desktop" in body:
+                current_cfg["desktop"].update(body["desktop"])
             if "telegram" in body:
                 current_cfg["telegram"].update(body["telegram"])
             if "discord" in body:
                 current_cfg["discord"].update(body["discord"])
-            if "desktop" in body:
-                current_cfg["desktop"].update(body["desktop"])
-            if "email" in body:
-                current_cfg["email"].update(body["email"])
-            if "tcdd_token" in body:
-                current_cfg["tcdd_token"] = body["tcdd_token"].strip().replace("Bearer ", "")
             
             from notifyseat.core.config import AppConfig
             new_cfg = AppConfig.from_dict(current_cfg)

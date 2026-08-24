@@ -362,139 +362,76 @@ async function handleCreateTask(e) {
   }
 }
 
-// --- Settings & TCDD Connection ---
-
-async function handleConnectTCDD() {
-  const btnHeader = document.getElementById('btnConnectTcddHeader');
-  const btnModal = document.getElementById('btnAutoConnectTcdd');
-  const statusText = document.getElementById('tcddStatusText');
-  const tokenInput = document.getElementById('cfgTcddToken');
-
-  let token = tokenInput ? tokenInput.value.trim() : '';
-
-  if (!token) {
-    token = prompt("Please paste your active TCDD Bearer token (from ebilet F12 Network tab -> Authorization header):", "");
-    if (!token) return;
-    if (tokenInput) tokenInput.value = token;
-  }
-
-  if (btnHeader) btnHeader.innerText = '⏳ Connecting...';
-  if (btnModal) btnModal.innerText = '⏳ Connecting...';
-  if (statusText) statusText.innerText = 'Status: Authenticating session...';
-
-  try {
-    const res = await fetch('/api/tcdd/connect', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token })
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      if (btnHeader) {
-        btnHeader.innerText = '✔ TCDD Connected';
-        btnHeader.className = 'btn btn-success';
-      }
-      if (btnModal) {
-        btnModal.innerText = '✔ TCDD Connected';
-        btnModal.className = 'btn btn-success';
-      }
-      if (statusText) {
-        statusText.innerText = 'Status: Connected (Active Session)';
-        statusText.style.color = 'var(--accent-green)';
-      }
-      appendLog('⚡ TCDD session connected successfully. Live real-time checking active.', 'log-alert');
-      
-      // Auto trigger check for visible tasks
-      loadTasks();
-    } else {
-      if (btnHeader) btnHeader.innerText = '⚡ Connect TCDD';
-      if (btnModal) btnModal.innerText = '⚡ Connect TCDD';
-      if (statusText) statusText.innerText = 'Status: Connection Failed';
-      alert('Could not authenticate TCDD token: ' + (data.error || 'Unknown error'));
-    }
-  } catch (err) {
-    if (btnHeader) btnHeader.innerText = '⚡ Connect TCDD';
-    if (btnModal) btnModal.innerText = '⚡ Connect TCDD';
-    if (statusText) statusText.innerText = 'Status: Error';
-  }
-}
+// --- Settings & Notification Channels ---
 
 async function loadSettings() {
   try {
     const res = await fetch('/api/config');
     const cfg = await res.json();
 
-    const tcddToken = cfg.tcdd_token || '';
-    const tokenInput = document.getElementById('cfgTcddToken');
-    if (tokenInput) tokenInput.value = tcddToken;
+    // WhatsApp
+    const wa = cfg.whatsapp || {};
+    const waPhoneEl = document.getElementById('cfgWhatsappPhone');
+    const waKeyEl = document.getElementById('cfgWhatsappApiKey');
+    const waEnabledEl = document.getElementById('cfgWhatsappEnabled');
+    if (waPhoneEl) waPhoneEl.value = wa.phone_number || '';
+    if (waKeyEl) waKeyEl.value = wa.apikey || '';
+    if (waEnabledEl) waEnabledEl.checked = wa.enabled !== false;
 
-    const btnHeader = document.getElementById('btnConnectTcddHeader');
-    const statusText = document.getElementById('tcddStatusText');
-    if (tcddToken) {
-      if (btnHeader) {
-        btnHeader.innerText = '✔ TCDD Connected';
-        btnHeader.className = 'btn btn-success';
-      }
-      if (statusText) {
-        statusText.innerText = 'Status: Connected (Active Session)';
-        statusText.style.color = 'var(--accent-green)';
-      }
-    } else {
-      if (btnHeader) {
-        btnHeader.innerText = '⚡ Connect TCDD';
-        btnHeader.className = 'btn btn-warning';
-      }
-      if (statusText) {
-        statusText.innerText = 'Status: Not Connected (Click 1-Click Connect)';
-        statusText.style.color = 'var(--text-muted)';
-      }
+    // Email (Gmail)
+    const em = cfg.email || {};
+    const emUserEl = document.getElementById('cfgSmtpUser');
+    const emPassEl = document.getElementById('cfgSmtpPass');
+    const emRecipEl = document.getElementById('cfgSmtpRecipient');
+    const emEnabledEl = document.getElementById('cfgEmailEnabled');
+    if (emUserEl) emUserEl.value = em.username || '';
+    if (emPassEl) emPassEl.value = em.password || '';
+    if (emRecipEl) emRecipEl.value = em.recipient_email || '';
+    if (emEnabledEl) emEnabledEl.checked = !!em.enabled;
+
+    // Desktop
+    const desk = cfg.desktop || {};
+    const deskEnabledEl = document.getElementById('cfgDesktopEnabled');
+    const soundEnabledEl = document.getElementById('cfgSoundEnabled');
+    if (deskEnabledEl) deskEnabledEl.checked = desk.enabled !== false;
+    if (soundEnabledEl) soundEnabledEl.checked = desk.sound_enabled !== false;
+
+    // Update Channel Status Pill
+    const statusEl = document.getElementById('statChannelsStatus');
+    if (statusEl) {
+      const active = [];
+      if (wa.enabled && wa.phone_number) active.push('WhatsApp');
+      if (em.enabled && em.username) active.push('E-posta');
+      if (desk.enabled) active.push('Masaüstü');
+      statusEl.textContent = active.length > 0 ? active.join(' + ') : 'Pasif (Ayar Yapın)';
     }
-
-    document.getElementById('cfgTelegramToken').value = cfg.telegram.bot_token || '';
-    document.getElementById('cfgTelegramChatId').value = cfg.telegram.chat_id || '';
-    document.getElementById('cfgTelegramEnabled').checked = !!cfg.telegram.enabled;
-
-    document.getElementById('cfgDiscordUrl').value = cfg.discord.webhook_url || '';
-    document.getElementById('cfgDiscordEnabled').checked = !!cfg.discord.enabled;
-
-    document.getElementById('cfgDesktopEnabled').checked = !!cfg.desktop.enabled;
-    document.getElementById('cfgSoundEnabled').checked = !!cfg.desktop.sound_enabled;
-
-    document.getElementById('cfgSmtpHost').value = cfg.email.smtp_host || 'smtp.gmail.com';
-    document.getElementById('cfgSmtpPort').value = cfg.email.smtp_port || 587;
-    document.getElementById('cfgSmtpUser').value = cfg.email.username || '';
-    document.getElementById('cfgSmtpPass').value = cfg.email.password || '';
-    document.getElementById('cfgSmtpRecipient').value = cfg.email.recipient_email || '';
-    document.getElementById('cfgEmailEnabled').checked = !!cfg.email.enabled;
   } catch (e) {}
 }
 
 async function handleSaveSettings(e) {
   e.preventDefault();
+  const gmailUser = document.getElementById('cfgSmtpUser').value.trim();
+  const recipient = document.getElementById('cfgSmtpRecipient').value.trim() || gmailUser;
+
   const payload = {
-    tcdd_token: document.getElementById('cfgTcddToken') ? document.getElementById('cfgTcddToken').value : '',
-    telegram: {
-      enabled: document.getElementById('cfgTelegramEnabled').checked,
-      bot_token: document.getElementById('cfgTelegramToken').value,
-      chat_id: document.getElementById('cfgTelegramChatId').value
+    whatsapp: {
+      enabled: document.getElementById('cfgWhatsappEnabled').checked,
+      phone_number: document.getElementById('cfgWhatsappPhone').value.trim(),
+      apikey: document.getElementById('cfgWhatsappApiKey').value.trim()
     },
-    discord: {
-      enabled: document.getElementById('cfgDiscordEnabled').checked,
-      webhook_url: document.getElementById('cfgDiscordUrl').value
+    email: {
+      enabled: document.getElementById('cfgEmailEnabled').checked,
+      smtp_host: 'smtp.gmail.com',
+      smtp_port: 587,
+      use_tls: true,
+      username: gmailUser,
+      password: document.getElementById('cfgSmtpPass').value.trim(),
+      sender_email: gmailUser,
+      recipient_email: recipient
     },
     desktop: {
       enabled: document.getElementById('cfgDesktopEnabled').checked,
       sound_enabled: document.getElementById('cfgSoundEnabled').checked
-    },
-    email: {
-      enabled: document.getElementById('cfgEmailEnabled').checked,
-      smtp_host: document.getElementById('cfgSmtpHost').value,
-      smtp_port: parseInt(document.getElementById('cfgSmtpPort').value) || 587,
-      username: document.getElementById('cfgSmtpUser').value,
-      password: document.getElementById('cfgSmtpPass').value,
-      recipient_email: document.getElementById('cfgSmtpRecipient').value,
-      use_tls: true
     }
   };
 
@@ -504,12 +441,13 @@ async function handleSaveSettings(e) {
     body: JSON.stringify(payload)
   });
 
-  alert('Settings saved successfully!');
+  alert('✔ Bildirim ayarları başarıyla kaydedildi!');
   closeModal('modalSettings');
   loadSettings();
 }
 
 async function testNotification(channel) {
+  const channelNameTr = channel === 'whatsapp' ? 'WhatsApp' : (channel === 'email' ? 'E-posta' : 'Masaüstü');
   const res = await fetch('/api/test-notify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -517,8 +455,8 @@ async function testNotification(channel) {
   });
   const data = await res.json();
   if (data.success) {
-    alert(`✔ Test notification for '${channel}' sent successfully!`);
+    alert(`✔ ${channelNameTr} test bildirimi başarıyla gönderildi! Lütfen kontrol edin.`);
   } else {
-    alert(`✖ Test notification failed for '${channel}'. Please check credentials.`);
+    alert(`✖ ${channelNameTr} bildirimi gönderilemedi. Lütfen bilgilerinizi (API Key veya Uygulama Şifresi) kontrol edin.`);
   }
 }

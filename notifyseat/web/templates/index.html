@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NotifySeat - Local Seat Availability Notifier</title>
-  <link rel="stylesheet" href="/static/css/style.css?v=3">
+  <title>NotifySeat - Koltuk & İptal Bilet Takip Radarı</title>
+  <link rel="stylesheet" href="/static/css/style.css?v=4">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚅</text></svg>">
 </head>
 <body>
@@ -16,25 +16,22 @@
         <div class="brand-icon">🚅</div>
         <div>
           <h1 class="h5 mb-0 fw-bold" style="letter-spacing: -0.5px;">NotifySeat</h1>
-          <p style="font-size: 0.75rem; color: var(--text-muted);">Local Seat & Cancellation Radar</p>
+          <p style="font-size: 0.75rem; color: var(--text-muted);">Otomatik Koltuk & İptal Bilet Radarı</p>
         </div>
       </div>
       <div class="header-actions">
         <div id="engineStatusBadge" class="status-pill status-paused">
           <div class="pulse-dot"></div>
-          <span id="engineStatusText">Engine Idle</span>
+          <span id="engineStatusText">Motor Durduruldu</span>
         </div>
         <button id="btnToggleEngine" class="btn btn-success" onclick="toggleEngine()">
-          ▶ Start Engine
-        </button>
-        <button id="btnConnectTcddHeader" class="btn btn-warning" onclick="handleConnectTCDD()">
-          ⚡ Connect TCDD
+          ▶ Motoru Başlat
         </button>
         <button class="btn btn-primary" onclick="openNewTaskModal()">
-          + Add Route
+          + Rota Ekle
         </button>
         <button class="btn btn-secondary" onclick="openSettingsModal()">
-          ⚙ Settings
+          ⚙ Bildirim Ayarları
         </button>
       </div>
     </div>
@@ -44,59 +41,52 @@
   <main class="container">
     
     <!-- Stats Row -->
-    <div class="stats-grid">
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
       <div class="stat-card">
         <div class="stat-icon">🎯</div>
         <div class="stat-info">
-          <h3>Active Routes</h3>
+          <h3>Aktif İzlenen Seferler</h3>
           <div class="stat-value" id="statActiveTasks">0</div>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🔍</div>
         <div class="stat-info">
-          <h3>Total Checks Run</h3>
+          <h3>Toplam Yapılan Tarama</h3>
           <div class="stat-value" id="statTotalChecks">0</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">🎉</div>
+        <div class="stat-icon">📱</div>
         <div class="stat-info">
-          <h3>Seats Detected</h3>
-          <div class="stat-value" id="statSeatsFound" style="color: var(--accent-green);">0</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">⏱️</div>
-        <div class="stat-info">
-          <h3>Radar Frequency</h3>
-          <div class="stat-value" style="font-size: 1.2rem; color: var(--accent-blue);">Every 1 Minute</div>
+          <h3>Bildirim Kanalları</h3>
+          <div class="stat-value" id="statChannelsStatus" style="font-size: 1.1rem; color: var(--accent-green);">WhatsApp & E-posta</div>
         </div>
       </div>
     </div>
 
     <!-- Active Tasks Section -->
     <div class="section-header">
-      <h2>Active Monitored Routes</h2>
-      <button class="btn btn-sm btn-secondary" onclick="loadTasks()">🔄 Refresh</button>
+      <h2>Takip Edilen Rotalar</h2>
+      <button class="btn btn-sm btn-secondary" onclick="loadTasks()">🔄 Yenile</button>
     </div>
 
     <div class="tasks-grid" id="tasksContainer">
       <!-- Tasks rendered dynamically -->
       <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted);">
-        No routes being monitored yet. Click <b>+ Add Route</b> to start!
+        Henüz izlenen bir rota yok. Başlamak için yukarıdaki <b>+ Rota Ekle</b> butonuna tıklayın!
       </div>
     </div>
 
     <!-- Live Activity Logs -->
     <div class="section-header">
-      <h2>Live Radar & Activity Stream</h2>
-      <button class="btn btn-sm btn-secondary" onclick="clearLogs()">Clear Log</button>
+      <h2>Canlı Radar & Aktivite Akışı</h2>
+      <button class="btn btn-sm btn-secondary" onclick="clearLogs()">Günlüğü Temizle</button>
     </div>
     <div class="logs-container" id="logsContainer">
       <div class="log-entry">
-        <span class="log-time">[System]</span>
-        <span>NotifySeat Web Radar initialized. Ready to catch cancelled seats.</span>
+        <span class="log-time">[Sistem]</span>
+        <span>NotifySeat Radar motoru hazır. İptal edilen koltuklar anında yakalanacaktır.</span>
       </div>
     </div>
 
@@ -106,77 +96,69 @@
   <div class="modal-backdrop" id="modalNewTask">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3>Track New Route</h3>
+        <h3>Yeni Rota Takibi Ekle</h3>
         <button class="modal-close" onclick="closeModal('modalNewTask')">&times;</button>
-      </div>
-
-      <div class="tabs">
-        <button class="tab-btn active" onclick="switchTransportTab('tcdd')">🚅 TCDD Train</button>
-        <button class="tab-btn" onclick="switchTransportTab('flight')">✈️ Flight</button>
-        <button class="tab-btn" onclick="switchTransportTab('bus')">🚌 Intercity Bus</button>
       </div>
 
       <form id="newTaskForm" onsubmit="handleCreateTask(event)">
         <input type="hidden" id="taskTransportType" value="tcdd">
 
         <div class="form-group">
-          <label>Popular Routes Quick Select</label>
+          <label>Popüler Rotalar Hızlı Seçim</label>
           <select class="form-control" id="quickRouteSelect" onchange="applyQuickRoute(this.value)">
-            <option value="">-- Choose a standard route or type custom below --</option>
+            <option value="">-- Popüler bir hat seçin veya aşağıya yazın --</option>
           </select>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="form-group">
-            <label for="originInput">Departure Point</label>
-            <input type="text" class="form-control" id="originInput" required placeholder="e.g. İstanbul(Söğütlüçeşme)">
+            <label for="originInput">Kalkış İstasyonu</label>
+            <input type="text" class="form-control" id="originInput" required placeholder="örn: İstanbul(Söğütlüçeşme)">
           </div>
           <div class="form-group">
-            <label for="destInput">Arrival Point</label>
-            <input type="text" class="form-control" id="destInput" required placeholder="e.g. Ankara Gar">
+            <label for="destInput">Varış İstasyonu</label>
+            <input type="text" class="form-control" id="destInput" required placeholder="örn: Eskişehir veya Ankara Gar">
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="form-group">
-            <label for="travelDate">Travel Date</label>
+            <label for="travelDate">Seyahat Tarihi</label>
             <input type="date" class="form-control" id="travelDate" required>
           </div>
           <div class="form-group">
-            <label for="timeFilter">Time Window (Optional)</label>
+            <label for="timeFilter">Zaman Dilimi (İsteğe Bağlı)</label>
             <select class="form-control" id="timeFilter">
-              <option value="">Any Time (All Day)</option>
-              <option value="morning">Morning (05:00 - 12:00)</option>
-              <option value="afternoon">Afternoon (12:00 - 18:00)</option>
-              <option value="evening">Evening (18:00 - 24:00)</option>
+              <option value="">Tüm Gün (Tüm Seferler)</option>
+              <option value="morning">Sabah (05:00 - 12:00)</option>
+              <option value="afternoon">Öğleden Sonra (12:00 - 18:00)</option>
+              <option value="evening">Akşam (18:00 - 24:00)</option>
             </select>
           </div>
         </div>
 
         <div class="form-group">
-          <label for="seatClass">Seat Class Preference</label>
+          <label for="seatClass">Koltuk Sınıfı Tercihi</label>
           <select class="form-control" id="seatClass">
-            <option value="ANY">Any Class (Business, Ekonomi, Yataklı, Özel)</option>
-            <option value="Business">Business Class Only</option>
-            <option value="Economy">Ekonomi Only</option>
-            <option value="Yataklı">Yataklı (Sleeper) Only</option>
+            <option value="ANY">Fark Etmez (Ekonomi, Business, Yataklı, Özel)</option>
+            <option value="Business">Yalnızca Business</option>
+            <option value="Economy">Yalnızca Ekonomi</option>
+            <option value="Yataklı">Yalnızca Yataklı</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label>Alert Channels</label>
+          <label>Bildirim Gönderilecek Kanallar</label>
           <div class="channel-checkboxes">
-            <label class="checkbox-label"><input type="checkbox" name="ch" value="desktop" checked> 🔔 Desktop/Audio</label>
-            <label class="checkbox-label"><input type="checkbox" name="ch" value="telegram"> 📱 Telegram</label>
-            <label class="checkbox-label"><input type="checkbox" name="ch" value="discord"> 💬 Discord</label>
-            <label class="checkbox-label"><input type="checkbox" name="ch" value="email"> 📧 Email</label>
-            <label class="checkbox-label"><input type="checkbox" name="ch" value="sms"> 📲 SMS</label>
+            <label class="checkbox-label"><input type="checkbox" name="ch" value="whatsapp" checked> 📱 WhatsApp</label>
+            <label class="checkbox-label"><input type="checkbox" name="ch" value="email" checked> 📧 E-posta</label>
+            <label class="checkbox-label"><input type="checkbox" name="ch" value="desktop" checked> 🔔 Masaüstü / Ses</label>
           </div>
         </div>
 
         <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modalNewTask')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Start Monitoring Route</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalNewTask')">İptal</button>
+          <button type="submit" class="btn btn-primary">Rotayı İzlemeye Başla</button>
         </div>
       </form>
     </div>
@@ -184,107 +166,119 @@
 
   <!-- Settings Modal -->
   <div class="modal-backdrop" id="modalSettings">
-    <div class="modal-dialog">
+    <div class="modal-dialog" style="max-width: 650px;">
       <div class="modal-header">
-        <h3>Notification & System Settings</h3>
+        <h3>Bildirim Ayarları & Entegrasyonlar</h3>
         <button class="modal-close" onclick="closeModal('modalSettings')">&times;</button>
       </div>
 
       <form id="settingsForm" onsubmit="handleSaveSettings(event)">
         
-        <!-- TCDD Live Authentication -->
-        <h4 style="color: var(--accent-yellow); margin-bottom: 0.5rem;">🚆 TCDD Live Authentication & Session</h4>
-        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
-          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
-            Auto-connect or paste your TCDD web session token to bypass Cloudflare/WAF bot restrictions and query authentic live seat counts.
+        <!-- WhatsApp Settings with QR Code -->
+        <div class="settings-section">
+          <h4 style="color: #25D366; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+            <span>📱</span> WhatsApp Direkt Bildirim (CallMeBot)
+          </h4>
+          
+          <div class="qr-guide-box">
+            <div class="qr-code-wrapper">
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=https%3A%2F%2Fwa.me%2F34623789580%3Ftext%3DI%2Ballow%2Bcallmebot%2Bto%2Bsend%2Bme%2Bmessages" alt="WhatsApp QR Code" class="qr-img">
+              <a href="https://wa.me/34623789580?text=I+allow+callmebot+to+send+me+messages" target="_blank" class="btn btn-sm btn-success" style="font-size: 0.75rem; width: 100%; justify-content: center; margin-top: 6px;">
+                WhatsApp'ta Aç ➔
+              </a>
+            </div>
+            <div class="qr-steps">
+              <div class="step-item">
+                <span class="step-num">1</span>
+                <span>Telefon kameranızla <b>QR Kodu taratın</b> veya butona tıklayın.</span>
+              </div>
+              <div class="step-item">
+                <span class="step-num">2</span>
+                <span>Açılan sohbetteki hazır mesajı (<i>I allow callmebot to send me messages</i>) bota <b>Gönderin</b>.</span>
+              </div>
+              <div class="step-item">
+                <span class="step-num">3</span>
+                <span>Botun size anında yanıt olarak verdiği <b>API Key</b> kodunu ve telefon numaranızı aşağıya yazın.</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+            <div class="form-group" style="margin-bottom: 0.5rem;">
+              <label>WhatsApp Telefon Numaranız</label>
+              <input type="text" class="form-control" id="cfgWhatsappPhone" placeholder="05051234567 veya +905051234567">
+            </div>
+            <div class="form-group" style="margin-bottom: 0.5rem;">
+              <label>CallMeBot API Key</label>
+              <input type="text" class="form-control" id="cfgWhatsappApiKey" placeholder="örn: 1897404">
+            </div>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+            <label class="checkbox-label" style="display: inline-flex;">
+              <input type="checkbox" id="cfgWhatsappEnabled" checked> WhatsApp Bildirimlerini Aktif Et
+            </label>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="testNotification('whatsapp')">⚡ WhatsApp'ı Test Et</button>
+          </div>
+        </div>
+
+        <!-- Gmail / Email Settings -->
+        <div class="settings-section" style="margin-top: 1.5rem;">
+          <h4 style="color: var(--accent-blue); display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+            <span style="display: flex; align-items: center; gap: 0.5rem;"><span>📧</span> Gmail E-posta Bildirimi</span>
+            <a href="https://myaccount.google.com/apppasswords" target="_blank" class="btn btn-sm btn-primary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">
+              🔑 Google Uygulama Şifresi Al ➔
+            </a>
+          </h4>
+
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.4;">
+            Google hesabınızın güvenliği için normal şifreniz yerine yukarıdaki butondan 16 haneli ücretsiz bir <b>Uygulama Şifresi</b> (App Password) oluşturup buraya girin.
           </p>
-          <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.75rem;">
-            <button type="button" id="btnAutoConnectTcdd" class="btn btn-warning" onclick="handleConnectTCDD()">
-              ⚡ 1-Click Connect TCDD
-            </button>
-            <span id="tcddStatusText" style="font-size: 0.85rem; color: var(--text-muted);">Status: Checking...</span>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+              <label>Gmail Adresiniz</label>
+              <input type="email" class="form-control" id="cfgSmtpUser" placeholder="adiniz@gmail.com">
+            </div>
+            <div class="form-group">
+              <label>16 Haneli Uygulama Şifresi</label>
+              <input type="password" class="form-control" id="cfgSmtpPass" placeholder="•••• •••• •••• ••••">
+            </div>
           </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <label style="font-size: 0.8rem;">Session Bearer Token</label>
-            <input type="text" class="form-control" id="cfgTcddToken" placeholder="eyJhbGciOiJSUzI1NiIs..." style="font-size: 0.8rem; font-family: monospace;">
+
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label>Bildirimin Gönderileceği E-posta Adresi</label>
+            <input type="email" class="form-control" id="cfgSmtpRecipient" placeholder="adiniz@gmail.com (boş bırakılırsa kendi adresinize gider)">
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+            <label class="checkbox-label" style="display: inline-flex;">
+              <input type="checkbox" id="cfgEmailEnabled"> E-posta Bildirimlerini Aktif Et
+            </label>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="testNotification('email')">⚡ E-postayı Test Et</button>
           </div>
         </div>
 
-        <!-- Telegram -->
-        <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem;">📱 Telegram Bot Settings</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
-          <div class="form-group">
-            <label>Bot Token</label>
-            <input type="text" class="form-control" id="cfgTelegramToken" placeholder="123456:ABC-DEF...">
+        <!-- Desktop Sound Settings -->
+        <div class="settings-section" style="margin-top: 1.5rem;">
+          <h4 style="color: var(--accent-green); margin-bottom: 0.5rem;">🔔 Masaüstü Bildirim & Ses</h4>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 1.25rem;">
+              <label class="checkbox-label"><input type="checkbox" id="cfgDesktopEnabled" checked> Masaüstü Kutucuğu</label>
+              <label class="checkbox-label"><input type="checkbox" id="cfgSoundEnabled" checked> Zil Sesi</label>
+            </div>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="playChimeSound()">🔊 Sesi Test Et</button>
           </div>
-          <div class="form-group">
-            <label>Chat ID</label>
-            <input type="text" class="form-control" id="cfgTelegramChatId" placeholder="987654321">
-          </div>
-        </div>
-        <div style="margin-bottom: 1rem;">
-          <label class="checkbox-label" style="display: inline-flex;"><input type="checkbox" id="cfgTelegramEnabled"> Enable Telegram Alerts</label>
-          <button type="button" class="btn btn-sm btn-secondary" onclick="testNotification('telegram')" style="margin-left: 10px;">Test Telegram</button>
         </div>
 
-        <!-- Discord -->
-        <h4 style="color: var(--accent-purple); margin-bottom: 0.5rem;">💬 Discord Webhook</h4>
-        <div class="form-group">
-          <label>Webhook URL</label>
-          <input type="text" class="form-control" id="cfgDiscordUrl" placeholder="https://discord.com/api/webhooks/...">
-        </div>
-        <div style="margin-bottom: 1rem;">
-          <label class="checkbox-label" style="display: inline-flex;"><input type="checkbox" id="cfgDiscordEnabled"> Enable Discord Alerts</label>
-          <button type="button" class="btn btn-sm btn-secondary" onclick="testNotification('discord')" style="margin-left: 10px;">Test Discord</button>
-        </div>
-
-        <!-- Desktop Sound -->
-        <h4 style="color: var(--accent-green); margin-bottom: 0.5rem;">🔔 Desktop & Browser Sound</h4>
-        <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
-          <label class="checkbox-label"><input type="checkbox" id="cfgDesktopEnabled" checked> Enable Desktop Popup</label>
-          <label class="checkbox-label"><input type="checkbox" id="cfgSoundEnabled" checked> Enable Audio Chime</label>
-          <button type="button" class="btn btn-sm btn-secondary" onclick="playChimeSound()">🔊 Play Sound</button>
-        </div>
-
-        <!-- Email -->
-        <h4 style="color: var(--accent-yellow); margin-bottom: 0.5rem;">📧 SMTP Email Settings</h4>
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem;">
-          <div class="form-group">
-            <label>SMTP Host</label>
-            <input type="text" class="form-control" id="cfgSmtpHost" placeholder="smtp.gmail.com">
-          </div>
-          <div class="form-group">
-            <label>Port</label>
-            <input type="number" class="form-control" id="cfgSmtpPort" placeholder="587">
-          </div>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.5rem;">
-          <div class="form-group">
-            <label>Username / Email</label>
-            <input type="text" class="form-control" id="cfgSmtpUser" placeholder="you@gmail.com">
-          </div>
-          <div class="form-group">
-            <label>App Password</label>
-            <input type="password" class="form-control" id="cfgSmtpPass" placeholder="••••••••">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Recipient Email</label>
-          <input type="email" class="form-control" id="cfgSmtpRecipient" placeholder="user@example.com">
-        </div>
-        <div style="margin-bottom: 1.5rem;">
-          <label class="checkbox-label" style="display: inline-flex;"><input type="checkbox" id="cfgEmailEnabled"> Enable Email Alerts</label>
-          <button type="button" class="btn btn-sm btn-secondary" onclick="testNotification('email')" style="margin-left: 10px;">Test Email</button>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modalSettings')">Close</button>
-          <button type="submit" class="btn btn-primary">Save Settings</button>
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalSettings')">Kapat</button>
+          <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
         </div>
       </form>
     </div>
   </div>
 
-  <script src="/static/js/app.js?v=3"></script>
+  <script src="/static/js/app.js?v=4"></script>
 </body>
 </html>
