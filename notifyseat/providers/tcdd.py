@@ -10,39 +10,45 @@ from notifyseat.core.models import TrackingTask, CheckResult, TransportType, Ser
 from notifyseat.core.logger import logger
 
 
-# Official TCDD YTP Station mapping (Synchronized with https://cdn-api-prod-ytp.tcddtasimacilik.gov.tr/datas/stations.json)
+# Official TCDD YTP Major High-Speed Train (YHT) & Main Corridor Stations
 TCDD_STATIONS = [
+    # İstanbul YHT İstasyonları
     {"id": "1325", "name": "İstanbul(Söğütlüçeşme)", "city": "İstanbul", "aliases": ["istanbul", "sogutlucesme", "söğütlüçeşme", "kadikoy", "anadolu"]},
     {"id": "992", "name": "İstanbul(Halkalı)", "city": "İstanbul", "aliases": ["halkali", "halkalı", "avrupa"]},
     {"id": "48", "name": "İstanbul(Pendik)", "city": "İstanbul", "aliases": ["pendik"]},
     {"id": "55", "name": "İstanbul(Bostancı)", "city": "İstanbul", "aliases": ["bostanci", "bostancı"]},
     {"id": "20", "name": "İstanbul(Bakırköy)", "city": "İstanbul", "aliases": ["bakirkoy", "bakırköy"]},
+    
+    # Ankara YHT İstasyonları
     {"id": "98", "name": "Ankara Gar", "city": "Ankara", "aliases": ["ankara", "gar", "baskent", "ankara yht"]},
     {"id": "1306", "name": "Eryaman YHT", "city": "Ankara", "aliases": ["eryaman"]},
+    {"id": "76", "name": "Polatlı YHT", "city": "Ankara", "aliases": ["polatli", "polatlı"]},
+
+    # Eskişehir
     {"id": "93", "name": "Eskişehir", "city": "Eskişehir", "aliases": ["eskisehir", "eskişehir", "eskisehir gar"]},
-    {"id": "292", "name": "Eskişehir HT", "city": "Eskişehir", "aliases": ["eskisehir ht", "eskişehir ht"]},
+
+    # Kocaeli & Sakarya
+    {"id": "19", "name": "Gebze", "city": "Kocaeli", "aliases": ["gebze"]},
+    {"id": "61", "name": "İzmit YHT", "city": "Kocaeli", "aliases": ["izmit", "kocaeli"]},
+    {"id": "7", "name": "Arifiye", "city": "Sakarya", "aliases": ["arifiye", "sakarya"]},
+
+    # Bilecik
+    {"id": "10", "name": "Bilecik YHT", "city": "Bilecik", "aliases": ["bilecik"]},
+    {"id": "14", "name": "Bozüyük YHT", "city": "Bilecik", "aliases": ["bozuyuk", "bozüyük"]},
+
+    # Konya & Karaman
     {"id": "796", "name": "Konya", "city": "Konya", "aliases": ["konya"]},
     {"id": "1336", "name": "Selçuklu YHT (Konya)", "city": "Konya", "aliases": ["selcuklu", "selçuklu"]},
     {"id": "31", "name": "Karaman", "city": "Karaman", "aliases": ["karaman"]},
-    {"id": "36", "name": "Sivas", "city": "Sivas", "aliases": ["sivas"]},
-    {"id": "52", "name": "Yozgat YHT", "city": "Yozgat", "aliases": ["yozgat"]},
-    {"id": "312", "name": "İzmir (Basmane)", "city": "İzmir", "aliases": ["izmir", "basmane"]},
-    {"id": "5", "name": "İzmir(Alsancak)", "city": "İzmir", "aliases": ["alsancak"]},
-    {"id": "753", "name": "Adana", "city": "Adana", "aliases": ["adana"]},
-    {"id": "10", "name": "Bilecik YHT", "city": "Bilecik", "aliases": ["bilecik"]},
-    {"id": "18", "name": "Kayseri", "city": "Kayseri", "aliases": ["kayseri"]},
-    {"id": "32", "name": "Kars", "city": "Kars", "aliases": ["kars"]},
+
+    # Kırıkkale, Yozgat & Sivas YHT Koridoru
     {"id": "15", "name": "Kırıkkale YHT", "city": "Kırıkkale", "aliases": ["kirikkale", "kırıkkale"]},
-    {"id": "61", "name": "İzmit YHT", "city": "Kocaeli", "aliases": ["izmit", "kocaeli"]},
-    {"id": "19", "name": "Gebze", "city": "Kocaeli", "aliases": ["gebze"]},
-    {"id": "3", "name": "Adapazarı", "city": "Sakarya", "aliases": ["adapazari", "adapazarı", "sakarya"]},
-    {"id": "7", "name": "Arifiye", "city": "Sakarya", "aliases": ["arifiye"]},
-    {"id": "27", "name": "Kütahya", "city": "Kütahya", "aliases": ["kutahya", "kütahya"]},
-    {"id": "300", "name": "Adnanmenderes Havaalanı", "city": "İzmir", "aliases": ["havalimani", "havaalani"]},
-    {"id": "13", "name": "Denizli", "city": "Denizli", "aliases": ["denizli"]},
-    {"id": "28", "name": "Malatya", "city": "Malatya", "aliases": ["malatya"]},
-    {"id": "12", "name": "Diyarbakır", "city": "Diyarbakır", "aliases": ["diyarbakir", "diyarbakır"]},
-    {"id": "16", "name": "Gaziantep", "city": "Gaziantep", "aliases": ["gaziantep"]}
+    {"id": "52", "name": "Yozgat YHT", "city": "Yozgat", "aliases": ["yozgat"]},
+    {"id": "36", "name": "Sivas", "city": "Sivas", "aliases": ["sivas"]},
+
+    # Ege / Ana Hat Bağlantıları
+    {"id": "312", "name": "İzmir (Basmane)", "city": "İzmir", "aliases": ["izmir", "basmane"]},
+    {"id": "27", "name": "Kütahya", "city": "Kütahya", "aliases": ["kutahya", "kütahya"]}
 ]
 
 TURKISH_MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]

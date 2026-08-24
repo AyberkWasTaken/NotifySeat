@@ -281,12 +281,12 @@ def interactive_create_task() -> Optional[TrackingTask]:
     """Guides the user through an interactive setup wizard to configure a route tracker."""
     print_wizard_header()
 
-    print("\n\033[1;36m📌 Major Stations & Cities:\033[0m")
+    print("\n\033[1;36m📌 Major Stations & YHT Corridors:\033[0m")
     print("  • \033[1;37mİstanbul\033[0m (Söğütlüçeşme, Halkalı, Pendik, Bostancı, Bakırköy)")
-    print("  • \033[1;37mAnkara\033[0m (Ankara Gar, Eryaman YHT)")
-    print("  • \033[1;37mEskişehir, Konya, Karaman, Sivas, Yozgat\033[0m")
-    print("  • \033[1;37mİzmir (Basmane / Alsancak), İzmit, Gebze, Bilecik, Sakarya\033[0m")
-    print("  • \033[1;37mAdana, Kayseri, Kars, Kırıkkale, Denizli, Diyarbakır, Gaziantep\033[0m\n")
+    print("  • \033[1;37mAnkara\033[0m (Ankara Gar, Eryaman YHT, Polatlı YHT)")
+    print("  • \033[1;37mEskişehir, Konya, Karaman, Sivas, Yozgat, Kırıkkale\033[0m")
+    print("  • \033[1;37mKocaeli / Sakarya / Bilecik\033[0m (İzmit YHT, Gebze, Arifiye, Bilecik YHT, Bozüyük YHT)")
+    print("  • \033[1;37mİzmir (Basmane), Kütahya\033[0m\n")
 
     provider = registry.get(TransportType.TCDD)
 
