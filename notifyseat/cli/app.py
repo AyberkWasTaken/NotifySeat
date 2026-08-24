@@ -260,6 +260,62 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
         print("✔ NotifySeat stopped.")
 
 
+def cmd_logs(db: Database, limit: int = 30, show_file_path: bool = False):
+    from notifyseat.core.logger import LOG_FILE
+
+    print_banner()
+    logs = db.list_logs(limit=limit)
+    stats = db.get_stats()
+
+    if HAS_RICH and console:
+        console.print(f"[bold cyan]📋 Developer Scan & Check History[/bold cyan] [dim](Log File: {LOG_FILE})[/dim]\n")
+        console.print(f"[dim]Total Scans Recorded: {stats.get('total_checks', 0)} | Openings Detected: {stats.get('seats_found_count', 0)} | Active Tasks: {stats.get('active_tasks', 0)}[/dim]\n")
+
+        if not logs:
+            console.print("[yellow]No check logs recorded yet. Start tracking with 'notifyseat run'.[/yellow]\n")
+            return
+
+        table = Table(show_header=True, header_style="bold magenta", border_style="dim white")
+        table.add_column("Time", justify="center", style="bold yellow")
+        table.add_column("Task ID", justify="center", style="bold cyan")
+        table.add_column("Status", justify="center")
+        table.add_column("Seats", justify="center")
+        table.add_column("Message / Summary", justify="left")
+
+        for entry in logs:
+            ts_raw = entry.get("timestamp", "")
+            try:
+                dt = datetime.fromisoformat(ts_raw)
+                ts_str = dt.strftime("%d-%m %H:%M:%S")
+            except Exception:
+                ts_str = ts_raw[:19]
+
+            t_id = str(entry.get("task_id", ""))
+            seats = entry.get("seats_found", 0)
+            status_raw = entry.get("status", "")
+            msg = entry.get("message", "")
+
+            if seats > 0:
+                status_cell = f"[bold green]🟢 FOUND[/bold green]"
+                seats_cell = f"[bold green]{seats}[/bold green]"
+            elif status_raw == "ERROR":
+                status_cell = f"[bold red]⚠️ ERROR[/bold red]"
+                seats_cell = "[dim]0[/dim]"
+            else:
+                status_cell = f"[dim red]🔴 SOLD OUT[/dim red]"
+                seats_cell = "[dim]0[/dim]"
+
+            table.add_row(ts_str, t_id, status_cell, seats_cell, msg[:85] + ("..." if len(msg) > 85 else ""))
+
+        console.print(table)
+        console.print(f"\n[dim]💡 Tip: View raw stream logs with: tail -f {LOG_FILE}[/dim]\n")
+    else:
+        print(f"--- Developer Check History (Last {len(logs)}) ---")
+        for entry in logs:
+            print(f"[{entry.get('timestamp')}] Task {entry.get('task_id')}: {entry.get('status')} ({entry.get('seats_found')} seats) - {entry.get('message')}")
+        print(f"Raw log file: {LOG_FILE}\n")
+
+
 def cmd_config(config_mgr: ConfigManager):
     interactive_config(config_mgr)
 
@@ -316,6 +372,11 @@ def main():
     chk_p = subparsers.add_parser("check", help="Trigger an immediate live check for a task (or all active tasks)")
     chk_p.add_argument("task_id", nargs="?", default=None, help="Task ID to check (optional, checks all active if omitted)")
 
+    # logs / history
+    logs_p = subparsers.add_parser("logs", help="View developer scan history and check logs")
+    logs_p.add_argument("-n", "--limit", type=int, default=30, help="Number of recent logs to show (default 30)")
+    subparsers.add_parser("history", help="Alias for logs")
+
     # run
     subparsers.add_parser("run", help="Start monitoring engine in foreground")
     subparsers.add_parser("start", help="Alias for run")
@@ -355,6 +416,7 @@ def main():
         print("  notifyseat track         ➔ Add a new route to monitor")
         print("  notifyseat run           ➔ Start the background monitoring engine")
         print("  notifyseat check [id]    ➔ Trigger immediate live check (or check all)")
+        print("  notifyseat logs          ➔ View developer check history & background logs")
         print("  notifyseat list          ➔ View all configured routes")
         print("  notifyseat config        ➔ Setup WhatsApp & Email alerts (auto-opens browser)")
         print("  notifyseat test-notify   ➔ Test WhatsApp, Email, Desktop alerts")
@@ -371,6 +433,8 @@ def main():
             cmd_track(db, args)
         elif args.command == "check":
             cmd_check_now(db, config_mgr, args.task_id)
+        elif args.command in ("logs", "history"):
+            cmd_logs(db, limit=getattr(args, "limit", 30))
         elif args.command in ("run", "start"):
             cmd_run(db, config_mgr, args)
         elif args.command in ("config", "notify-setup"):

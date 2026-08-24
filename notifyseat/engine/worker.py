@@ -47,6 +47,10 @@ class TaskWorker:
             details=result.to_dict()
         )
 
+        # Record to developer log file
+        status_tag = "SEATS_OPEN" if (result.found and result.seats_count > 0) else ("ERROR" if not result.success else "SOLD_OUT")
+        logger.info(f"Check [{task.origin} -> {task.destination} ({task.display_date})]: {status_tag} ({result.seats_count} seats) | {result.message}")
+
         prev_seats = task.last_found_seats if task.last_found_seats is not None else 0
         new_seats = result.seats_count
 
@@ -59,6 +63,7 @@ class TaskWorker:
         should_notify = notify and result.found and is_opening_from_soldout
 
         if should_notify:
+            logger.info(f"🚨 CANCELLATION OPENING DETECTED for task [{task.name}]: {new_seats} seats opened up!")
             open_services = [s for s in result.services if s.total_available_seats > 0]
             first_s = open_services[0] if open_services else (result.services[0] if result.services else None)
 
