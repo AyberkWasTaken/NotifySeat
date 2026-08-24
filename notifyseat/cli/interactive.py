@@ -1,7 +1,17 @@
 """Interactive Terminal Wizard for NotifySeat."""
+import os
+import sys
 from datetime import datetime, timedelta
 from typing import Optional, List
-import readline
+
+try:
+    import readline
+except ImportError:
+    try:
+        import pyreadline3 as readline
+    except ImportError:
+        readline = None
+
 from notifyseat.core.models import TrackingTask, TransportType, TaskStatus
 from notifyseat.providers.registry import registry
 from notifyseat.providers.tcdd import TCDD_STATIONS, normalize_tr
@@ -81,6 +91,13 @@ def prompt_text(prompt: str, default: str = "") -> str:
 def prompt_station(prompt: str) -> str:
     C_CYAN = "\001\033[1;36m\002"
     C_RESET = "\001\033[0m\002"
+    if readline is not None:
+        try:
+            completer = StationTabCompleter(TCDD_STATIONS)
+            readline.set_completer(completer.complete)
+            readline.parse_and_bind("tab: complete")
+        except Exception:
+            pass
     while True:
         try:
             val = input(f"{C_CYAN}? {prompt}:{C_RESET} ").strip()
@@ -92,15 +109,67 @@ def prompt_station(prompt: str) -> str:
             raise KeyboardInterrupt
 
 
+def _read_key_cross_platform() -> str:
+    """Reads a single keypress or arrow key cross-platform across Windows, Linux, and macOS."""
+    if os.name == 'nt':  # Windows
+        import msvcrt
+        ch = msvcrt.getch()
+        if ch in (b'\x00', b'\xe0'):
+            ch2 = msvcrt.getch()
+            if ch2 == b'H':  # Up
+                return 'UP'
+            elif ch2 == b'P':  # Down
+                return 'DOWN'
+            elif ch2 == b'K':  # Left
+                return 'LEFT'
+            elif ch2 == b'M':  # Right
+                return 'RIGHT'
+        elif ch in (b'\r', b'\n'):
+            return 'ENTER'
+        elif ch == b' ':
+            return 'SPACE'
+        elif ch in (b'a', b'A'):
+            return 'ALL'
+        elif ch in (b'k', b'K'):
+            return 'UP'
+        elif ch in (b'j', b'J'):
+            return 'DOWN'
+        elif ch == b'\x03':  # Ctrl+C
+            raise KeyboardInterrupt
+        return ch.decode(errors='ignore')
+    else:  # Unix (Linux / macOS)
+        char = sys.stdin.read(1)
+        if char == '\x1b':
+            seq = sys.stdin.read(2)
+            if seq == '[A':
+                return 'UP'
+            elif seq == '[B':
+                return 'DOWN'
+            elif seq == '[C':
+                return 'RIGHT'
+            elif seq == '[D':
+                return 'LEFT'
+        elif char in ('\r', '\n'):
+            return 'ENTER'
+        elif char == ' ':
+            return 'SPACE'
+        elif char in ('a', 'A'):
+            return 'ALL'
+        elif char in ('k', 'K'):
+            return 'UP'
+        elif char in ('j', 'J'):
+            return 'DOWN'
+        elif char == '\x03':
+            raise KeyboardInterrupt
+        return char
+
+
 def prompt_multi_checkbox(title: str, options: List[str], initial_selected: Optional[List[bool]] = None) -> List[int]:
     """
     Renders a flicker-free, scrollable terminal multi-select menu with checkbox toggles.
+    Cross-platform support for Windows, Linux, and macOS.
     Controls: Up/Down arrows (or j/k) to navigate, Space to toggle, 'a' for all/none, Enter to submit.
     """
-    import sys
-    import tty
-    import termios
-
     if not sys.stdin.isatty() or len(options) == 0:
         return list(range(len(options)))
 
@@ -152,40 +221,39 @@ def prompt_multi_checkbox(title: str, options: List[str], initial_selected: Opti
     print(f"\n\033[1;36m{title}\033[0m")
     render(first_render=True)
 
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
+    if os.name == 'nt':
+        os.system('')  # Enable ANSI in Windows terminal
+        fd = None
+        old_settings = None
+    else:
+        import tty
+        import termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        tty.setraw(fd)
 
     try:
-        tty.setraw(fd)
         while True:
-            char = sys.stdin.read(1)
-            if char == '\x1b':  # Escape sequence (e.g. arrow keys)
-                seq = sys.stdin.read(2)
-                if seq == '[A':  # Up arrow
-                    cursor = (cursor - 1) % num_opts
-                    render()
-                elif seq == '[B':  # Down arrow
-                    cursor = (cursor + 1) % num_opts
-                    render()
-            elif char in ('k', 'K'):  # Vim up
+            key = _read_key_cross_platform()
+            if key == 'UP':
                 cursor = (cursor - 1) % num_opts
                 render()
-            elif char in ('j', 'J'):  # Vim down
+            elif key == 'DOWN':
                 cursor = (cursor + 1) % num_opts
                 render()
-            elif char == ' ':  # Toggle space
+            elif key == 'SPACE':
                 selected[cursor] = not selected[cursor]
                 render()
-            elif char in ('a', 'A'):  # Toggle all
+            elif key == 'ALL':
                 all_checked = all(selected)
                 selected = [not all_checked] * num_opts
                 render()
-            elif char in ('\r', '\n'):  # Enter confirm
+            elif key == 'ENTER':
                 break
-            elif char == '\x03':  # Ctrl+C
-                raise KeyboardInterrupt
     finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        if old_settings is not None and fd is not None:
+            import termios
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         # Restore cursor
         sys.stdout.write("\033[?25h\n")
         sys.stdout.flush()
