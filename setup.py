@@ -6,6 +6,14 @@ setup(
     description="Local-First Transport Seat & Cancellation Notifier",
     author="Ayberk",
     packages=find_packages(),
+    include_package_data=True,
+    package_data={
+        "notifyseat.web": [
+            "templates/*.html",
+            "static/css/*.css",
+            "static/js/*.js",
+        ],
+    },
     install_requires=[
         "requests>=2.28.0",
         "rich>=13.0.0",

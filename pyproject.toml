@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "notifyseat"
+version = "1.0.0"
+description = "Local-First Transport Seat & Cancellation Notifier (TCDD, Flights, Buses)"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Ayberk" }
+]
+keywords = ["tcdd", "transport", "seat-notifier", "train", "flight", "bus", "yht", "cancellation-radar"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities"
+]
+requires-python = ">=3.8"
+dependencies = [
+    "requests>=2.28.0",
+    "rich>=13.0.0"
+]
+
+[project.scripts]
+notifyseat = "notifyseat.cli.app:main"
+
+[project.urls]
+Homepage = "https://github.com/ayberk/NotifySeat"
+"Bug Tracker" = "https://github.com/ayberk/NotifySeat/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["notifyseat*"]
+
+[tool.setuptools.package-data]
+"notifyseat.web" = [
+    "templates/*.html",
+    "static/css/*.css",
+    "static/js/*.js"
+]

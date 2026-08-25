@@ -58,12 +58,25 @@ class DesktopNotifier(BaseNotifier):
                     print(f"\n\a\033[1;32m[NOTIFYSEAT ALERT] {title}\033[0m\n{message}\n")
                     return True
             elif os_type == "Darwin":  # macOS
-                apple_script = f'display notification "{message}" with title "{title}" sound name "Glass"'
+                import json
+                apple_script = f'display notification {json.dumps(message)} with title {json.dumps(title)} sound name "Glass"'
                 subprocess.run(["osascript", "-e", apple_script], check=False, timeout=5, stderr=subprocess.DEVNULL)
                 return True
             elif os_type == "Windows":
-                ps_cmd = f'[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $textNodes = $template.GetElementsByTagName("text"); $textNodes.Item(0).AppendChild($template.CreateTextNode("{title}")) > $null; $textNodes.Item(1).AppendChild($template.CreateTextNode("{message}")) > $null; $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("NotifySeat"); $toast = [Windows.UI.Notifications.ToastNotification]::new($template); $notifier.Show($toast);'
-                subprocess.run(["powershell", "-Command", ps_cmd], check=False, timeout=5, stderr=subprocess.DEVNULL)
+                # Escape double quotes and special characters for PowerShell
+                win_title = title.replace('`', '``').replace('"', '`"').replace("'", "''")
+                win_msg = message.replace('`', '``').replace('"', '`"').replace("'", "''")
+                ps_cmd = (
+                    f'[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; '
+                    f'$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); '
+                    f'$textNodes = $template.GetElementsByTagName("text"); '
+                    f'$textNodes.Item(0).AppendChild($template.CreateTextNode("{win_title}")) > $null; '
+                    f'$textNodes.Item(1).AppendChild($template.CreateTextNode("{win_msg}")) > $null; '
+                    f'$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("NotifySeat"); '
+                    f'$toast = [Windows.UI.Notifications.ToastNotification]::new($template); '
+                    f'$notifier.Show($toast);'
+                )
+                subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], check=False, timeout=5, stderr=subprocess.DEVNULL)
                 return True
         except Exception as e:
             logger.warning(f"Desktop notification failed: {e}")
@@ -78,8 +91,17 @@ class DesktopNotifier(BaseNotifier):
             sys.stdout.write("\a")
             sys.stdout.flush()
 
-            # Linux audio playback
-            if platform.system() == "Linux":
+            os_type = platform.system()
+            if os_type == "Windows":
+                try:
+                    import winsound
+                    winsound.MessageBeep(winsound.MB_ICONASTERISK)
+                except Exception:
+                    pass
+            elif os_type == "Darwin":  # macOS
+                if shutil.which("afplay") and os.path.exists("/System/Library/Sounds/Glass.aiff"):
+                    subprocess.run(["afplay", "/System/Library/Sounds/Glass.aiff"], check=False, timeout=3, stderr=subprocess.DEVNULL)
+            elif os_type == "Linux":
                 import os
                 candidate_sounds = [
                     "/usr/share/sounds/Oxygen-Sys-App-Positive.ogg",

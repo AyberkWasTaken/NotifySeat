@@ -541,10 +541,18 @@ def open_url_quietly(url: str):
     """Opens a URL in default browser without letting subprocess stderr leak into the terminal."""
     import subprocess
     import shutil
+    import sys
     try:
-        if shutil.which("xdg-open"):
+        if sys.platform.startswith("linux") and shutil.which("xdg-open"):
             subprocess.Popen(
                 ["xdg-open", url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+        elif sys.platform == "darwin":
+            subprocess.Popen(
+                ["open", url],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True
@@ -553,7 +561,11 @@ def open_url_quietly(url: str):
             import webbrowser
             webbrowser.open(url)
     except Exception:
-        pass
+        try:
+            import webbrowser
+            webbrowser.open(url)
+        except Exception:
+            pass
 
 
 def interactive_config(config_mgr):
