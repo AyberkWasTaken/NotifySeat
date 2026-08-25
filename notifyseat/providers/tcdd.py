@@ -420,10 +420,10 @@ class TCDDProvider(BaseProvider):
             found = total_seats >= task.min_seats
             open_services = [s for s in services if s.total_available_seats > 0]
             if found and open_services:
-                descriptions = [f"found {s.total_available_seats} empty seats on {s.departure_time} route ({', '.join([f'{cnt} {cls}' for cls, cnt in s.class_breakdown.items() if cnt > 0])})" for s in open_services]
-                msg = f"🎉 {'; '.join(descriptions)} from {origin_name} to {dest_name} on {task.date}."
+                descriptions = [f"{s.total_available_seats} empty seats on {s.departure_time} route" for s in open_services]
+                msg = f"Found {', '.join(descriptions)}."
             else:
-                msg = f"TCDD Live Check ({origin_name} ➔ {dest_name} on {task.date}): All checked routes are Sold Out. Monitoring for cancellations..."
+                msg = "All checked routes are sold out."
 
             return CheckResult(
                 task_id=task.id,

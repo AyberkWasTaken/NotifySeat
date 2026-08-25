@@ -47,9 +47,20 @@ class TaskWorker:
             details=result.to_dict()
         )
 
-        # Record to developer log file
-        status_tag = "SEATS_OPEN" if (result.found and result.seats_count > 0) else ("ERROR" if not result.success else "SOLD_OUT")
-        logger.info(f"Check [{task.origin} -> {task.destination} ({task.display_date})]: {status_tag} ({result.seats_count} seats) | {result.message}")
+        # Clean log message format
+        if result.found and result.seats_count > 0:
+            open_desc = []
+            for s in result.services:
+                if s.total_available_seats > 0:
+                    open_desc.append(f"{s.departure_time} ({s.total_available_seats} seats)")
+            desc_str = ", ".join(open_desc) if open_desc else f"{result.seats_count} seats available"
+            log_msg = f"{task.origin} -> {task.destination} on {task.display_date}: {desc_str}"
+        elif not result.success:
+            log_msg = f"{task.origin} -> {task.destination} on {task.display_date}: {result.message or 'Check failed'}"
+        else:
+            log_msg = f"{task.origin} -> {task.destination} on {task.display_date}: All checked routes are sold out."
+
+        logger.info(log_msg)
 
         prev_seats = task.last_found_seats if task.last_found_seats is not None else 0
         new_seats = result.seats_count
