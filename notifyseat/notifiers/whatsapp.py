@@ -1,5 +1,6 @@
 """WhatsApp (CallMeBot) notification provider."""
-import urllib.parse
+import re
+import html
 import requests
 from typing import Optional, Dict, Any
 from notifyseat.notifiers.base import BaseNotifier
@@ -25,6 +26,35 @@ def normalize_phone_number(phone: str) -> str:
     return "+" + digits
 
 
+def extract_clean_error(raw_text: str) -> str:
+    """Extracts a clean, human-readable error string from raw HTML gateway responses."""
+    if not raw_text:
+        return "Empty response from server"
+    
+    # Strip HTML and decode entities
+    unescaped = html.unescape(raw_text)
+    clean = re.sub(r"<[^>]+>", " ", unescaped)
+    clean = re.sub(r"\s+", " ", clean).strip()
+
+    # Look for specific error or service notices
+    for marker in [
+        "Service is down",
+        "API key is invalid",
+        "API key not found",
+        "Phone number not registered",
+        "Daily limit reached",
+        "Error",
+        "error",
+        "Invalid",
+        "Sorry for the inconvenience"
+    ]:
+        if marker in clean:
+            idx = clean.find(marker)
+            return clean[idx:].strip()
+
+    return clean if len(clean) <= 150 else clean[:150] + "..."
+
+
 class WhatsAppNotifier(BaseNotifier):
     """Sends notifications directly to user's WhatsApp via CallMeBot gateway."""
 
@@ -46,21 +76,24 @@ class WhatsAppNotifier(BaseNotifier):
             return False
 
         phone = normalize_phone_number(self.config.phone_number)
-
         text = message.strip()
 
-        encoded_text = urllib.parse.quote_plus(text)
-        url = f"https://api.callmebot.com/whatsapp.php?phone={phone}&text={encoded_text}&apikey={self.config.apikey}"
+        params = {
+            "phone": phone,
+            "text": text,
+            "apikey": self.config.apikey
+        }
 
         try:
-            r = requests.get(url, timeout=12)
-            if r.status_code == 200 and "error" not in r.text.lower():
+            r = requests.get("https://api.callmebot.com/whatsapp.php", params=params, timeout=12)
+            if r.status_code == 200 and "error" not in r.text.lower() and "service is down" not in r.text.lower():
                 return True
             else:
-                logger.error(f"WhatsApp notification failed: HTTP {r.status_code} - {r.text[:200]}")
+                clean_err = extract_clean_error(r.text)
+                logger.error(f"WhatsApp notification failed: [{r.status_code}] {clean_err}")
                 return False
         except Exception as e:
-            logger.error(f"WhatsApp notification error: {e}")
+            logger.error(f"WhatsApp notification network error: {e}")
             return False
 
     def test(self) -> bool:
@@ -68,3 +101,4 @@ class WhatsAppNotifier(BaseNotifier):
             title="NotifySeat Test Alert",
             message="🎉 WhatsApp notification is connected and working! Ready to catch seat cancellations."
         )
+
