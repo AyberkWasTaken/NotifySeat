@@ -334,7 +334,12 @@ class TCDDProvider(BaseProvider):
                         fare_infos = train.get("availableFareInfo", [])
                         if fare_infos:
                             for fare in fare_infos:
-                                car_raw = fare.get("name") or fare.get("trainCarName")
+                                car_raw = fare.get("name") or (fare.get("trainCar") or {}).get("name") or fare.get("trainCarName") or fare.get("carNo") or fare.get("wagonNo")
+                                if not car_raw and fare.get("carIndex") is not None:
+                                    try:
+                                        car_raw = str(int(fare.get("carIndex")) + 1)
+                                    except Exception:
+                                        pass
                                 car_label = f"{car_raw}. Araba" if car_raw and str(car_raw).strip().isdigit() else (f"{car_raw}" if car_raw else "")
 
                                 c_list = fare.get("cabinClasses") or fare.get("availabilities") or []
@@ -364,7 +369,12 @@ class TCDDProvider(BaseProvider):
                         else:
                             for c_info in train.get("cabinClassAvailabilities", []):
                                 c_name_raw = (c_info.get("cabinClass") or {}).get("name", "")
-                                car_raw = c_info.get("trainCarName") or (c_info.get("trainCar") or {}).get("name")
+                                car_raw = c_info.get("trainCarName") or (c_info.get("trainCar") or {}).get("name") or c_info.get("name") or c_info.get("carNo") or c_info.get("wagonNo")
+                                if not car_raw and c_info.get("carIndex") is not None:
+                                    try:
+                                        car_raw = str(int(c_info.get("carIndex")) + 1)
+                                    except Exception:
+                                        pass
                                 car_label = f"{car_raw}. Araba" if car_raw and str(car_raw).strip().isdigit() else (f"{car_raw}" if car_raw else "")
                                 c_name_upper = c_name_raw.upper()
                                 if "BUSİNESS" in c_name_upper or "BUSINESS" in c_name_upper:
