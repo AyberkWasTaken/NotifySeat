@@ -88,6 +88,8 @@ class NotifySeatHTTPHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/stats":
             stats = self.db.get_stats()
             stats["engine_running"] = self.scheduler.is_running()
+            stats["is_in_backoff"] = self.scheduler.is_in_backoff()
+            stats["backoff_remaining_seconds"] = self.scheduler.backoff_remaining_seconds()
             self._send_json(stats)
             return
 
@@ -132,7 +134,7 @@ class NotifySeatHTTPHandler(http.server.BaseHTTPRequestHandler):
                 date=body.get("date", datetime.now().strftime("%Y-%m-%d")),
                 time_filter=body.get("time_filter"),
                 seat_class=body.get("seat_class", "ANY"),
-                check_interval_seconds=int(body.get("check_interval_seconds", 30)),
+                check_interval_seconds=int(body.get("check_interval_seconds", 90)),
                 notification_channels=body.get("notification_channels", ["desktop"]),
                 status=TaskStatus.ACTIVE
             )

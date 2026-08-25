@@ -37,18 +37,30 @@ class TaskWorker:
             "booking_url": result.services[0].booking_url if result.services else "https://ebilet.tcddtasimacilik.gov.tr"
         } if result.services else None
 
+        # Determine check status for history log
+        if result.rate_limited:
+            check_status = "RATE_LIMIT"
+        elif result.found:
+            check_status = "FOUND"
+        elif not result.success:
+            check_status = "ERROR"
+        else:
+            check_status = "NO_SEATS"
+
         # Log check to database
         self.db.log_check(
             task_id=task.id,
             success=result.success,
             seats_found=result.seats_count,
-            status="FOUND" if result.found else ("ERROR" if not result.success else "NO_SEATS"),
+            status=check_status,
             message=result.message,
             details=result.to_dict()
         )
 
-        # Clean log message format
-        if result.found and result.seats_count > 0:
+        # Clean, humanized log message format
+        if result.rate_limited:
+            log_msg = f"{task.origin} -> {task.destination}: TCDD sunucusu yoğunluk bildirdi, güvenlik molası devrede."
+        elif result.found and result.seats_count > 0:
             open_desc = []
             for s in result.services:
                 if s.total_available_seats > 0:

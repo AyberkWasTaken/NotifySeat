@@ -110,7 +110,7 @@ class TrackingTask:
     time_filter: Optional[str] = None  # e.g., "08:00-14:00" or specific hour "09:15"
     min_seats: int = 1
     seat_class: str = "ANY"  # ANY, ECONOMY, BUSINESS, PULMAN, YATAKLI
-    check_interval_seconds: int = 60
+    check_interval_seconds: int = 90
     notification_channels: List[str] = field(default_factory=lambda: ["desktop"])
     status: TaskStatus = TaskStatus.ACTIVE
     last_checked_at: Optional[str] = None
@@ -170,6 +170,8 @@ class CheckResult:
     services: List[ServiceInfo] = field(default_factory=list)
     message: str = ""
     error_message: Optional[str] = None
+    rate_limited: bool = False
+    backoff_seconds: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -181,4 +183,6 @@ class CheckResult:
             "services": [s.to_dict() for s in self.services],
             "message": self.message,
             "error_message": self.error_message,
+            "rate_limited": self.rate_limited,
+            "backoff_seconds": self.backoff_seconds,
         }

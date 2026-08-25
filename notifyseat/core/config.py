@@ -75,7 +75,7 @@ class AppConfig:
     desktop: DesktopConfig = field(default_factory=DesktopConfig)
     sms: SMSConfig = field(default_factory=SMSConfig)
     webhook: WebhookConfig = field(default_factory=WebhookConfig)
-    default_check_interval: int = 300
+    default_check_interval: int = 90
     user_name: str = "Ayberk"
     web_host: str = "127.0.0.1"
     web_port: int = 8080

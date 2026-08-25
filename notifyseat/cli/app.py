@@ -102,7 +102,7 @@ def cmd_track(db: Database, args: argparse.Namespace):
             destination=args.destination,
             date=args.date or (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y"),
             time_filter=args.time,
-            check_interval_seconds=args.interval or 300,
+            check_interval_seconds=args.interval or 90,
             notification_channels=channels,
             status=TaskStatus.ACTIVE
         )
@@ -221,13 +221,35 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
         db.create_task(demo_task)
         tasks = [demo_task]
 
-    print(f"\n[bold green]Starting NotifySeat Engine... Monitoring {len(tasks)} active route(s) (1-minute cycle)[/bold green]" if HAS_RICH else f"Starting NotifySeat Engine for {len(tasks)} tasks...")
+    print(f"\n[bold green]Starting NotifySeat Engine... Monitoring {len(tasks)} active route(s) (~1.5-minute smart cycle with anti-ban jitter)[/bold green]" if HAS_RICH else f"Starting NotifySeat Engine for {len(tasks)} tasks...")
     print("Press Ctrl+C at any time to exit gracefully.\n")
 
     def on_event(event_type: str, data: dict):
         # Ignore lifecycle and pre-check events to avoid premature/misleading terminal logs
         if event_type in ("engine_started", "engine_stopped", "task_checking"):
             return
+
+        if event_type == "rate_limit_backoff":
+            mins = data.get("minutes", 3)
+            if HAS_RICH and console:
+                console.print(Panel(
+                    f"[bold yellow]TCDD sunucuları geçici bir yoğunluk bildirdi.[/bold yellow]\n\n"
+                    f"IP adresinizi güvende tutmak ve sorgulamayı korumak adına yaklaşık [bold yellow]{mins} dakika[/bold yellow] dinlenme molası verildi.\n"
+                    f"[dim]Süre tamamlandığında kontroller otomatik olarak kaldığı yerden devam edecektir.[/dim]",
+                    title="🌱 Güvenlik Dinlenmesi",
+                    border_style="yellow"
+                ))
+            else:
+                print(f"\n🌱 TCDD Güvenlik Dinlenmesi: IP adresinizi korumak için {mins} dakika mola verildi. Kontroller otomatik devam edecek.\n")
+            return
+
+        if event_type == "rate_limit_recovered":
+            if HAS_RICH and console:
+                console.print("[bold green]✔ Güvenlik molası tamamlandı. Bilet kontrolleri normal hızında yeniden başladı.[/bold green]\n")
+            else:
+                print("\n✔ Güvenlik molası tamamlandı. Kontroller devam ediyor.\n")
+            return
+
         task_obj = data.get("task")
         result_obj = data.get("result")
         
@@ -239,7 +261,7 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
             print(f"[{ts}] {msg}")
 
         if event_type == "seats_found":
-            if HAS_RICH:
+            if HAS_RICH and console:
                 console.print(Panel(
                     f"[bold green]🚨 CANCELLATION OPENING DETECTED![/bold green]\n\n"
                     f"Route: [bold white]{data.get('name')}[/bold white]\n"
@@ -299,6 +321,9 @@ def cmd_logs(db: Database, limit: int = 30, show_file_path: bool = False):
             if seats > 0:
                 status_cell = f"[bold green]🟢 FOUND[/bold green]"
                 seats_cell = f"[bold green]{seats}[/bold green]"
+            elif status_raw == "RATE_LIMIT":
+                status_cell = f"[bold yellow]🟡 MOLA[/bold yellow]"
+                seats_cell = "[dim]-[/dim]"
             elif status_raw == "ERROR":
                 status_cell = f"[bold red]⚠️ ERROR[/bold red]"
                 seats_cell = "[dim]0[/dim]"

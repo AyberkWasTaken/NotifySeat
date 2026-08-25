@@ -273,6 +273,19 @@ class TCDDProvider(BaseProvider):
                             parsed = self._parse_ytp_response(task, data, origin_name, dest_name)
                             if parsed is not None:
                                 return parsed
+                    elif r.status_code == 429:
+                        logger.warning("TCDD sunucusu istek sınırına (rate limit) ulaşıldığını bildirdi.")
+                        return CheckResult(
+                            task_id=task.id,
+                            success=False,
+                            found=False,
+                            seats_count=0,
+                            rate_limited=True,
+                            backoff_seconds=180,
+                            message="TCDD sunucuları kısa süreli yoğunluk nedeniyle yavaşlamamızı istedi. IP adresinizi korumak için kontrolleri 3 dakika mola vererek otomatik devam ettireceğiz."
+                        )
+                    elif r.status_code == 403:
+                        logger.debug(f"YTP API 403 on {endpoint}")
                 except Exception as e:
                     logger.debug(f"YTP API probe error on {endpoint}: {e}")
                     continue

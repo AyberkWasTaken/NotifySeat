@@ -61,6 +61,48 @@ class TestEngine(unittest.TestCase):
         seat_found_events = [e for e in events if e[0] == "seats_found"]
         self.assertTrue(len(seat_found_events) >= 1)
 
+    def test_rate_limiting_and_backoff(self):
+        task = TrackingTask(
+            name="Rate Limit Test",
+            origin="Istanbul",
+            destination="Eskisehir",
+            date="2026-09-01",
+            transport_type=TransportType.SIMULATION,
+            check_interval_seconds=1
+        )
+        self.db.create_task(task)
+
+        # Mock rate limited result
+        from unittest.mock import patch, MagicMock
+        from notifyseat.core.models import CheckResult
+
+        mock_rate_limited = CheckResult(
+            task_id=task.id,
+            success=False,
+            found=False,
+            seats_count=0,
+            rate_limited=True,
+            backoff_seconds=10,
+            message="TCDD sunucusu yoğunluk bildirdi."
+        )
+
+        events = []
+        self.scheduler.subscribe_events(lambda evt, data: events.append((evt, data)))
+
+        with patch.object(self.scheduler.worker, 'execute_task', return_value=mock_rate_limited):
+            self.scheduler.start()
+            time.sleep(1.2)
+            self.assertTrue(self.scheduler.is_in_backoff())
+            self.assertGreater(self.scheduler.backoff_remaining_seconds(), 0)
+
+            # Check humanized event was fired
+            backoff_events = [e for e in events if e[0] == "rate_limit_backoff"]
+            self.assertTrue(len(backoff_events) >= 1)
+            backoff_msg = backoff_events[0][1]["message"]
+            self.assertIn("TCDD sunucuları", backoff_msg)
+            self.assertNotIn("[ERROR]", backoff_msg)
+            self.assertNotIn("RATE_LIMIT_EXCEEDED", backoff_msg)
+
 
 if __name__ == "__main__":
     unittest.main()

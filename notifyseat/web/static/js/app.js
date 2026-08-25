@@ -90,6 +90,11 @@ function handleStreamEvent(event) {
     } else {
       appendLog(data.message || `🔍 Checked ${data.name}: 0 seats available. Monitoring...`);
     }
+  } else if (type === 'rate_limit_backoff') {
+    const mins = data.minutes || 3;
+    appendLog(`🌱 TCDD Güvenlik Dinlenmesi: IP adresinizi korumak için ${mins} dakika mola verildi. Kontroller otomatik devam edecek.`, 'log-alert');
+  } else if (type === 'rate_limit_recovered') {
+    appendLog(`✔ Güvenlik molası tamamlandı. Bilet kontrolleri normal hızında yeniden başladı.`);
   } else if (type === 'engine_started') {
     updateEngineState(true);
     appendLog(`🚀 Background Monitoring Engine started.`, 'log-alert');
@@ -341,7 +346,7 @@ async function handleCreateTask(e) {
     destination: document.getElementById('destInput').value,
     date: document.getElementById('travelDate').value,
     time_filter: document.getElementById('timeFilter').value || null,
-    check_interval_seconds: 60,
+    check_interval_seconds: 90,
     seat_class: document.getElementById('seatClass').value,
     notification_channels: channels
   };

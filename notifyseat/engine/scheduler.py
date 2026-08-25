@@ -26,6 +26,12 @@ class EngineScheduler:
         self._lock = threading.Lock()
         self._event_subscribers: List[Callable[[str, Dict[str, Any]], None]] = []
         self._last_run_times: Dict[str, float] = {}
+        self._task_next_delays: Dict[str, float] = {}
+        
+        # Anti-ban & rate-limit backoff management
+        self._backoff_until: float = 0.0
+        self._consecutive_rate_limits: int = 0
+        self._was_in_backoff: bool = False
 
     def subscribe_events(self, callback: Callable[[str, Dict[str, Any]], None]):
         """Subscribe to real-time engine events (for CLI monitor and Web GUI live stream)."""
@@ -37,6 +43,12 @@ class EngineScheduler:
                 sub(event_type, data)
             except Exception:
                 pass
+
+    def is_in_backoff(self) -> bool:
+        return time.time() < self._backoff_until
+
+    def backoff_remaining_seconds(self) -> int:
+        return max(0, int(self._backoff_until - time.time()))
 
     def start(self):
         """Starts the background scheduler thread."""
@@ -71,32 +83,79 @@ class EngineScheduler:
         return True
 
     def _loop(self):
-        """Main daemon loop."""
+        """Main daemon loop with humanized jitter, multi-task staggering, and anti-ban backoff."""
         while self._running:
             try:
-                active_tasks = self.db.list_tasks(status=TaskStatus.ACTIVE)
                 now = time.time()
 
-                for task in active_tasks:
-                    if not self._running:
+                # Handle active rate-limit backoff
+                if now < self._backoff_until:
+                    self._was_in_backoff = True
+                    time.sleep(1)
+                    continue
+                elif self._was_in_backoff:
+                    self._was_in_backoff = False
+                    recovery_msg = "TCDD güvenlik dinlenmesi tamamlandı. Bilet kontrolleri normal hızında yeniden başladı."
+                    logger.info(recovery_msg)
+                    self._handle_worker_event("rate_limit_recovered", {
+                        "message": recovery_msg,
+                        "timestamp": datetime.now().isoformat()
+                    })
+
+                active_tasks = self.db.list_tasks(status=TaskStatus.ACTIVE)
+
+                for i, task in enumerate(active_tasks):
+                    if not self._running or time.time() < self._backoff_until:
                         break
 
-                    interval = max(5, task.check_interval_seconds or self.config.default_check_interval)
+                    base_interval = max(30, task.check_interval_seconds or self.config.default_check_interval)
                     last_time = self._last_run_times.get(task.id, 0)
+                    planned_delay = self._task_next_delays.get(task.id, base_interval)
 
-                    # Check if interval elapsed
-                    if now - last_time >= interval:
+                    # Check if target interval elapsed
+                    if now - last_time >= planned_delay:
                         try:
-                            # Apply slight jitter to prevent pattern recognition
-                            jitter = random.uniform(-1.0, 1.0)
-                            time.sleep(max(0.1, jitter + 0.2))
-                            
-                            self.worker.execute_task(task)
+                            result = self.worker.execute_task(task)
                             self._last_run_times[task.id] = time.time()
+
+                            # Compute next randomized interval with humanized jitter (+- 10-15s)
+                            jitter = random.uniform(-10.0, 15.0)
+                            self._task_next_delays[task.id] = max(30.0, base_interval + jitter)
+
+                            # Handle rate limit triggered by provider
+                            if result and getattr(result, "rate_limited", False):
+                                base_backoff = result.backoff_seconds or 180
+                                backoff_duration = min(600, int(base_backoff * (1.5 ** self._consecutive_rate_limits)))
+                                self._backoff_until = time.time() + backoff_duration
+                                self._consecutive_rate_limits += 1
+
+                                minutes = max(1, round(backoff_duration / 60))
+                                backoff_msg = (
+                                    f"TCDD sunucuları kısa süreli yoğunluk bildirdi. "
+                                    f"IP adresinizi korumak ve güvenli kalmak için {minutes} dakika mola veriyoruz. "
+                                    f"Süre bitince kontroller otomatik olarak kaldığı yerden devam edecek."
+                                )
+                                logger.warning(backoff_msg)
+                                self._handle_worker_event("rate_limit_backoff", {
+                                    "task_id": task.id,
+                                    "task_name": task.name,
+                                    "backoff_seconds": backoff_duration,
+                                    "minutes": minutes,
+                                    "message": backoff_msg,
+                                    "timestamp": datetime.now().isoformat()
+                                })
+                                break
+                            elif result and result.success:
+                                self._consecutive_rate_limits = 0
+
+                            # Stagger between multiple tasks (3-5s space) to avoid concurrent bursts
+                            if len(active_tasks) > 1 and i < len(active_tasks) - 1:
+                                time.sleep(random.uniform(2.5, 5.0))
+
                         except Exception as e:
                             logger.error(f"Error checking task {task.name} ({task.id}): {e}")
 
-                # Sleep brief interval between task sweeps
+                # Brief idle sleep between sweep evaluations
                 time.sleep(1)
 
             except Exception as e:

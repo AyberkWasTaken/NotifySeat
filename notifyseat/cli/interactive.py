@@ -522,7 +522,7 @@ def interactive_create_task() -> Optional[TrackingTask]:
         destination=destination,
         date=date_str,
         time_filter=time_filter,
-        check_interval_seconds=300,
+        check_interval_seconds=90,
         notification_channels=["desktop"],
         status=TaskStatus.ACTIVE,
         last_found_seats=initial_seats,
@@ -533,7 +533,7 @@ def interactive_create_task() -> Optional[TrackingTask]:
     print(f"  • Route: {task.origin} ➔ {task.destination}")
     print(f"  • Date: {task.display_date}")
     print(f"  • Window / Trains: {selected_summary}")
-    print(f"  • Radar: Checks every 5 minutes for cancellations\n")
+    print(f"  • Radar: Checks every ~1.5 minutes with anti-ban protection\n")
     return task
 
 
