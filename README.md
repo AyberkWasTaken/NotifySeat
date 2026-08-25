@@ -1,29 +1,40 @@
 # 🚅 NotifySeat
 
-> **Local-First Public Transport Seat & Cancellation Notifier**
+> **Local-First Public Transport Seat & Cancellation Notifier**  
+> *Instant cancellation radar for TCDD High-Speed Trains, Flights, and Intercity Buses.*
 
-NotifySeat is a **100% local, privacy-focused transport seat availability and cancellation radar**. It runs directly on your local computer (leaving your machine on to monitor) without requiring any cloud servers, backend hosting, or third-party subscription fees.
+[![PyPI version](https://img.shields.io/pypi/v/notifyseat.svg)](https://pypi.org/project/notifyseat/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/notifyseat.svg)](https://pypi.org/project/notifyseat/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Platform: Windows | macOS | Linux](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://pypi.org/project/notifyseat/)
+[![Local First](https://img.shields.io/badge/Privacy-100%25%20Local--First-brightgreen)]()
+
+---
+
+**NotifySeat** is a 100% local, privacy-focused seat availability and passenger cancellation radar. When tickets on popular routes are sold out, NotifySeat continuously monitors availability in the background and sends instant multi-channel alerts (Desktop, WhatsApp, Telegram, Discord, Email, SMS) the moment someone cancels their ticket and a seat becomes available.
 
 ---
 
 ## 🌟 Key Features
 
-- 🚆 **Multi-Transport Provider Engine**:
-  - **TCDD Trains (YHT & Mainline)**: Direct integration with EYBİS / TCDD ticketing system with wagon breakdowns (Pulman, Business, Yataklı).
-  - **Flights**: Monitors Pegasus Airlines, Turkish Airlines (THY), SunExpress, and AJet routes with seat tracking and direct booking links.
-  - **Intercity Buses**: Tracks bus routes and passenger cancellation openings across Pamukkale, Kamil Koç, Metro, and Obilet.
-  - **Live Demo & Simulation Mode**: Built-in test simulator to verify cancellation alerts instantly.
+- 🚆 **Multi-Transport Support**:
+  - **TCDD Trains (YHT & Mainline)**: Real-time EYBİS integration with wagon and class breakdown (Pulman, Business, Yataklı).
+  - **Flights**: Monitors Pegasus Airlines, Turkish Airlines (THY), AJet, and SunExpress with direct booking links.
+  - **Intercity Buses**: Tracks seat openings across Pamukkale, Kamil Koç, Metro, and Obilet.
+  - **Simulation & Test Engine**: Built-in simulator to test and verify cancellation alerts instantly.
 - 🔔 **Multi-Channel Instant Notifications**:
-  - **Desktop / OS Native**: Instant system notifications + audible audio chimes.
-  - **Telegram Bot**: Instant rich alerts with direct booking button.
-  - **Discord Webhook**: Embedded cards with route info and seat counts.
+  - **Desktop / OS Native**: Windows Toast Notifications, macOS AppleScript alerts, Linux `notify-send`, and audible audio chimes.
+  - **WhatsApp**: Instant messages sent directly to your phone.
+  - **Telegram Bot**: Rich alerts with inline booking buttons.
+  - **Discord Webhook**: Embedded rich cards with route details and seat counts.
   - **SMTP Email**: Formatted HTML & plain text alerts (Gmail, Outlook, custom SMTP).
-  - **SMS**: Netgsm & Twilio API support.
-  - **Custom Webhook**: JSON payloads to Home Assistant, Zapier, IFTTT, n8n.
+  - **SMS**: Netgsm and Twilio API support.
+  - **Custom Webhooks**: JSON payloads for Home Assistant, Zapier, IFTTT, n8n.
 - 💻 **Dual Interface**:
-  - **Interactive CLI**: Rich terminal tables, interactive wizard, live log stream, background daemon.
-  - **Modern Local Web GUI**: Embedded web dashboard with live stats, glassmorphic UI, in-browser Web Audio alerts, and settings manager.
-- 🛡️ **Anti-Ban & Smart Jitter**: Randomized polling intervals and human-like request headers to prevent rate limits.
+  - **Modern Local Web GUI**: Glassmorphic dashboard with live Server-Sent Events (SSE) updates, audio synthesis alerts, and graphical task manager.
+  - **Rich Interactive CLI**: Terminal wizard, colored status tables, and live scan logs.
+- 🛡️ **Anti-Ban & Smart Jitter**: Randomized polling intervals and human-like request headers to avoid rate limits.
+- 🔒 **100% Local-First & Private**: Runs entirely on your computer. Zero cloud server fees, zero telemetry, and your search routes/credentials never leave your machine.
 
 ---
 
@@ -31,30 +42,47 @@ NotifySeat is a **100% local, privacy-focused transport seat availability and ca
 
 ### 1. Installation
 
+Install globally via `pip`:
+
 ```bash
-# Clone the repository
+pip install --upgrade notifyseat
+```
+
+*Or install from source:*
+
+```bash
 git clone https://github.com/ayberk/NotifySeat.git
 cd NotifySeat
-
-# (Optional) Install rich for beautiful terminal formatting
-pip install -r requirements.txt
+pip install -e .
 ```
 
-### 2. Instant Live Demo
+---
 
-See seat cancellation detection and alert dispatch in action immediately:
+### 2. Launch the Local Web GUI Dashboard
+
+NotifySeat includes a built-in local web dashboard:
 
 ```bash
-python3 main.py demo
+notifyseat gui
 ```
 
-### 3. Launch Local Web GUI Dashboard
+Open **`http://127.0.0.1:8080`** in your browser to manage routes, configure notifications, and view real-time radar scans.
+
+---
+
+### 3. Interactive CLI Wizard
+
+Create a tracking route in seconds using the interactive terminal wizard:
 
 ```bash
-python3 main.py gui
+notifyseat track -i
 ```
 
-Open **`http://127.0.0.1:8080`** in your browser to access the full graphical dashboard.
+Start the background monitoring engine:
+
+```bash
+notifyseat run
+```
 
 ---
 
@@ -62,27 +90,34 @@ Open **`http://127.0.0.1:8080`** in your browser to access the full graphical da
 
 | Command | Description |
 |---|---|
-| `python3 main.py track -i` | Launch interactive wizard to add a new route to monitor |
-| `python3 main.py track --from "İstanbul(Söğütlüçeşme)" --to "Ankara Gar" --date 2026-09-15` | Add a route directly with flags |
-| `python3 main.py list` | List all configured route tracking tasks |
-| `python3 main.py run` / `start` | Start the background monitoring engine |
-| `python3 main.py gui [--port 8080]` | Start the local web dashboard server |
-| `python3 main.py test-notify <channel>` | Test alerts (`desktop`, `telegram`, `discord`, `email`, `sms`) |
-| `python3 main.py pause <task_id>` | Pause monitoring for a specific task |
-| `python3 main.py resume <task_id>` | Resume monitoring for a specific task |
-| `python3 main.py delete <task_id>` | Delete a tracking task |
-| `python3 main.py demo` | Run live simulation of a passenger cancelling a seat |
+| `notifyseat gui [--port 8080]` | Launch the local Web GUI dashboard |
+| `notifyseat track -i` | Launch interactive wizard to add a new route to monitor |
+| `notifyseat track --from "İstanbul" --to "Ankara" --date 2026-09-15` | Add a tracking task directly via arguments |
+| `notifyseat list` | List all monitored routes and their current status |
+| `notifyseat check [task_id]` | Trigger an immediate live scan for a specific route (or all) |
+| `notifyseat run` / `notifyseat start` | Start the background monitoring engine |
+| `notifyseat logs` / `notifyseat history` | View recent scan logs and seat findings |
+| `notifyseat config` | Interactive setup wizard for WhatsApp and Email notifications |
+| `notifyseat test-notify [channel]` | Test alerts (`desktop`, `whatsapp`, `telegram`, `discord`, `email`, `sms`) |
+| `notifyseat pause <task_id>` | Pause monitoring for a route |
+| `notifyseat resume <task_id>` | Resume monitoring for a route |
+| `notifyseat delete <task_id>` | Delete a tracking route |
 
 ---
 
-## ⚙️ Configuration & Notifications
+## ⚙️ Notification Channels Setup
 
-Configuration is stored securely on your local disk at `~/.notifyseat/config.json` and SQLite database at `~/.notifyseat/notifyseat.db`.
+Configuration is stored securely on your local disk at `~/.notifyseat/config.json` (and SQLite database at `~/.notifyseat/notifyseat.db`). You can configure them via the **Web GUI Settings** or CLI:
 
-### Telegram Bot Setup:
-1. Talk to `@BotFather` on Telegram to create a bot and get your token.
-2. Send a message to your bot and get your chat ID (via `@userinfobot`).
-3. Configure via Web GUI Settings or `~/.notifyseat/config.json`:
+### 📱 WhatsApp Setup:
+1. Run `notifyseat config` or open **Web GUI Settings**.
+2. Follow the 1-click prompt to activate the free CallMeBot WhatsApp gateway.
+3. Enter your phone number and API key.
+
+### ✈️ Telegram Bot Setup:
+1. Create a bot with [@BotFather](https://t.me/BotFather) on Telegram and get your Bot Token.
+2. Obtain your Chat ID using [@userinfobot](https://t.me/userinfobot).
+3. Set your token and chat ID in the Web GUI or `~/.notifyseat/config.json`:
    ```json
    "telegram": {
      "enabled": true,
@@ -90,35 +125,45 @@ Configuration is stored securely on your local disk at `~/.notifyseat/config.jso
      "chat_id": "YOUR_CHAT_ID"
    }
    ```
-4. Test with: `python3 main.py test-notify telegram`
+4. Test with: `notifyseat test-notify telegram`
 
-### Discord Webhook Setup:
-1. In Discord, go to Server Settings ➔ Integrations ➔ Webhooks ➔ New Webhook.
-2. Copy Webhook URL and paste into Web GUI Settings or `config.json`.
-3. Test with: `python3 main.py test-notify discord`
+### 🎮 Discord Webhook Setup:
+1. In Discord: **Server Settings** ➔ **Integrations** ➔ **Webhooks** ➔ **New Webhook**.
+2. Copy the Webhook URL and save it via the Web GUI or `config.json`.
+3. Test with: `notifyseat test-notify discord`
+
+### 📧 Email Setup (Gmail / SMTP):
+1. For Gmail: Generate an [App Password](https://myaccount.google.com/apppasswords).
+2. Configure SMTP host (`smtp.gmail.com`), port (`587`), email address, and App Password in Web GUI.
+3. Test with: `notifyseat test-notify email`
 
 ---
 
 ## 🏗️ Architecture
 
-```
+```text
 notifyseat/
-├── core/             # Data models, SQLite database, config manager, logger
-├── notifiers/        # Desktop, Telegram, Discord, Email, SMS, Webhook
-├── providers/        # TCDD Train, Flight (THY/Pegasus), Bus, Simulation
-├── engine/           # Multi-threaded background scheduler & worker
-├── cli/              # Rich interactive terminal application & wizard
-├── web/              # Local FastAPI/HTTP Web Dashboard & REST API
-│   ├── static/       # CSS styles & client JavaScript (Web Audio synthesis)
-│   └── templates/    # HTML5 Single Page Application
-├── tests/            # Full unit & integration test suite
-└── main.py           # Universal entrypoint
+├── core/             # Data models, SQLite database layer, configuration manager, logger
+├── notifiers/        # Desktop, WhatsApp, Telegram, Discord, Email, SMS, Webhook
+├── providers/        # TCDD Train (EYBİS), Flight (THY/Pegasus/AJet), Bus, Simulator
+├── engine/           # Multi-threaded background scheduler, backoff logic, and worker
+├── cli/              # Rich interactive terminal application and command parser
+├── web/              # Local HTTP Web Dashboard & REST API
+│   ├── static/       # CSS stylesheets & client JavaScript (Live SSE, Web Audio)
+│   └── templates/    # HTML5 Single Page Dashboard
+└── tests/            # Automated test suite
 ```
 
 ---
 
 ## 🔒 Privacy & Local-First Philosophy
 
-- **Zero Cloud**: Runs 100% locally on your computer.
-- **Zero Subscriptions**: Free forever.
-- **Zero Telemetry**: Your search routes, travel dates, and credentials never leave your machine.
+- **Zero Cloud Infrastructure**: Runs 100% locally on your computer.
+- **No Recurring Fees**: Free and open source forever.
+- **Zero Telemetry / Data Collection**: Your search queries, passenger information, and notification credentials never leave your personal machine.
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
