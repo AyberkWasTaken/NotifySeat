@@ -74,7 +74,8 @@ class TaskWorker:
         should_notify = notify and result.found and is_opening_from_soldout
 
         if should_notify:
-            logger.info(f"🚨 CANCELLATION OPENING DETECTED for task [{task.name}]: {new_seats} seats opened up!")
+            seat_word = "seat" if new_seats == 1 else "seats"
+            logger.info(f"🚨 Cancellation found: {task.origin} -> {task.destination} on {task.display_date} ({new_seats} {seat_word})")
             open_services = [s for s in result.services if s.total_available_seats > 0]
             first_s = open_services[0] if open_services else (result.services[0] if result.services else None)
 
