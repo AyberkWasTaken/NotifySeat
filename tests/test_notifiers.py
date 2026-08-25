@@ -1,6 +1,7 @@
 import unittest
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 from notifyseat.core.models import TrackingTask, TransportType
 from notifyseat.core.config import AppConfig
 from notifyseat.core.database import Database
@@ -21,12 +22,15 @@ class TestNotifiers(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def test_desktop_send(self):
+    @patch("subprocess.run")
+    def test_desktop_send(self, mock_run):
         desktop = DesktopNotifier(self.config.desktop)
         res = desktop.send("Test Title", "Test Message")
         self.assertTrue(res)
+        self.assertTrue(mock_run.called)
 
-    def test_manager_dispatch(self):
+    @patch("subprocess.run")
+    def test_manager_dispatch(self, mock_run):
         task = TrackingTask(
             name="Ankara Test",
             origin="Istanbul",
