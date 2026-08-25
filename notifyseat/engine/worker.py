@@ -71,18 +71,30 @@ class TaskWorker:
             if open_services:
                 for s in open_services:
                     cls_parts = []
-                    for cls_name, cnt in s.class_breakdown.items():
-                        if cnt > 0:
-                            cls_parts.append(f"{cnt} {cls_name}")
+                    if hasattr(s, "car_breakdown") and s.car_breakdown:
+                        for item in s.car_breakdown:
+                            cls_n = item.get("class", "Ekonomi")
+                            car_n = item.get("car", "")
+                            c_cnt = item.get("count", 1)
+                            if c_cnt > 0:
+                                car_str = f" ({car_n})" if car_n else ""
+                                cls_parts.append(f"{c_cnt} {cls_n}{car_str}")
+
+                    if not cls_parts:
+                        for cls_name, cnt in s.class_breakdown.items():
+                            if cnt > 0:
+                                cls_parts.append(f"{cnt} {cls_name}")
+
                     cls_str = ", ".join(cls_parts) if cls_parts else f"{s.total_available_seats} Koltuk"
                     summary_lines.append(f"• {s.departure_time} ➔ {cls_str}")
                 details_text = "\n".join(summary_lines)
             else:
                 details_text = f"• {new_seats} Koltuk"
 
-            title = f"İptal Bilet: {task.origin} ➔ {task.destination}"
+            title = f"NotifySeat Bildirimi: {task.origin} ➔ {task.destination}"
             body = (
-                f"🚨 İPTAL BİLET BULUNDU!\n\n"
+                f"NotifySeat Bildirimi\n\n"
+                f"İptal edilen bilet bulundu!\n\n"
                 f"🚆 Güzergah: {task.origin} ➔ {task.destination}\n"
                 f"📅 Tarih: {task.display_date}\n\n"
                 f"Boş Koltuklar:\n{details_text}\n\n"

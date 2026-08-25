@@ -58,14 +58,15 @@ class EmailNotifier(BaseNotifier):
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
             <div style="max-width: 520px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
                 <div style="background: #1e293b; color: white; padding: 18px 24px; text-align: center;">
-                    <h2 style="margin: 0; font-size: 18px;">🚨 NotifySeat İptal Bilet Bildirimi</h2>
+                    <h2 style="margin: 0; font-size: 18px; font-weight: 600;">NotifySeat Bildirimi</h2>
+                    <p style="margin: 4px 0 0; font-size: 14px; color: #cbd5e1;">İptal edilen bilet bulundu!</p>
                 </div>
                 <div style="padding: 24px; color: #1f2937; font-size: 15px; line-height: 1.6;">
                     {formatted_msg_html}
                     {booking_btn}
                 </div>
                 <div style="background: #f8fafc; padding: 12px; text-align: center; color: #94a3b8; font-size: 12px;">
-                    NotifySeat Otomatik Koltuk Takip Sistemi
+                    NotifySeat Koltuk & İptal Takip Sistemi
                 </div>
             </div>
         </body>

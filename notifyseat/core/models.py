@@ -51,6 +51,7 @@ class ServiceInfo:
     date: str
     total_available_seats: int
     class_breakdown: Dict[str, int] = field(default_factory=dict)
+    car_breakdown: List[Dict[str, Any]] = field(default_factory=list)
     price: Optional[float] = None
     currency: str = "TRY"
     booking_url: Optional[str] = None

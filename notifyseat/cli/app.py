@@ -269,11 +269,11 @@ def cmd_logs(db: Database, limit: int = 30, show_file_path: bool = False):
     stats = db.get_stats()
 
     if HAS_RICH and console:
-        console.print(f"[bold cyan]📋 Developer Scan & Check History[/bold cyan] [dim](Log File: {LOG_FILE})[/dim]\n")
-        console.print(f"[dim]Total Scans Recorded: {stats.get('total_checks', 0)} | Openings Detected: {stats.get('seats_found_count', 0)} | Active Tasks: {stats.get('active_tasks', 0)}[/dim]\n")
+        console.print(f"[bold cyan]📋 Tarama & Kontrol Geçmişi[/bold cyan] [dim]({LOG_FILE})[/dim]\n")
+        console.print(f"[dim]Toplam Tarama: {stats.get('total_checks', 0)} | İptal/Boş Koltuk Tespiti: {stats.get('seats_found_count', 0)} | Aktif Takipler: {stats.get('active_tasks', 0)}[/dim]\n")
 
         if not logs:
-            console.print("[yellow]No check logs recorded yet. Start tracking with 'notifyseat run'.[/yellow]\n")
+            console.print("[yellow]Henüz kayıtlı bir tarama geçmişi bulunmuyor. 'notifyseat run' ile takibe başlayabilirsiniz.[/yellow]\n")
             return
 
         table = Table(show_header=True, header_style="bold magenta", border_style="dim white")
@@ -309,12 +309,12 @@ def cmd_logs(db: Database, limit: int = 30, show_file_path: bool = False):
             table.add_row(ts_str, t_id, status_cell, seats_cell, msg[:85] + ("..." if len(msg) > 85 else ""))
 
         console.print(table)
-        console.print(f"\n[dim]💡 Tip: View raw stream logs with: tail -f {LOG_FILE}[/dim]\n")
+        console.print(f"\n[dim]💡 İpucu: Canlı log akışını izlemek için: tail -f {LOG_FILE}[/dim]\n")
     else:
-        print(f"--- Developer Check History (Last {len(logs)}) ---")
+        print(f"--- Tarama Geçmişi (Son {len(logs)}) ---")
         for entry in logs:
             print(f"[{entry.get('timestamp')}] Task {entry.get('task_id')}: {entry.get('status')} ({entry.get('seats_found')} seats) - {entry.get('message')}")
-        print(f"Raw log file: {LOG_FILE}\n")
+        print(f"Log dosyası: {LOG_FILE}\n")
 
 
 def cmd_config(config_mgr: ConfigManager):
@@ -374,7 +374,7 @@ def main():
     chk_p.add_argument("task_id", nargs="?", default=None, help="Task ID to check (optional, checks all active if omitted)")
 
     # logs / history
-    logs_p = subparsers.add_parser("logs", help="View developer scan history and check logs")
+    logs_p = subparsers.add_parser("logs", help="View route check & scan history")
     logs_p.add_argument("-n", "--limit", type=int, default=30, help="Number of recent logs to show (default 30)")
     subparsers.add_parser("history", help="Alias for logs")
 
@@ -417,7 +417,7 @@ def main():
         print("  notifyseat track         ➔ Add a new route to monitor")
         print("  notifyseat run           ➔ Start the background monitoring engine")
         print("  notifyseat check [id]    ➔ Trigger immediate live check (or check all)")
-        print("  notifyseat logs          ➔ View developer check history & background logs")
+        print("  notifyseat logs          ➔ View route check & scan history")
         print("  notifyseat list          ➔ View all configured routes")
         print("  notifyseat config        ➔ Setup WhatsApp & Email alerts (auto-opens browser)")
         print("  notifyseat test-notify   ➔ Test WhatsApp, Email, Desktop alerts")

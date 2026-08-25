@@ -326,14 +326,19 @@ class TCDDProvider(BaseProvider):
                                     price_amount = p
                                     break
 
-                        # Extract exact available seats per class from availableFareInfo or cabinClassAvailabilities
+                        # Extract exact available seats per class and carriage/araba
                         class_breakdown = {}
+                        car_breakdown = []
                         train_seats = 0
 
                         fare_infos = train.get("availableFareInfo", [])
                         if fare_infos:
                             for fare in fare_infos:
-                                for c_info in fare.get("cabinClasses", []):
+                                car_raw = fare.get("name") or fare.get("trainCarName")
+                                car_label = f"{car_raw}. Araba" if car_raw and str(car_raw).strip().isdigit() else (f"{car_raw}" if car_raw else "")
+
+                                c_list = fare.get("cabinClasses") or fare.get("availabilities") or []
+                                for c_info in c_list:
                                     c_name_raw = (c_info.get("cabinClass") or {}).get("name", "")
                                     c_name_upper = c_name_raw.upper()
                                     if "BUSİNESS" in c_name_upper or "BUSINESS" in c_name_upper:
@@ -344,16 +349,23 @@ class TCDDProvider(BaseProvider):
                                         # Only Business and Ekonomi are considered per Ayberk's requirement
                                         continue
 
-                                    count = int(c_info.get("availabilityCount", 0) or 0)
+                                    count = int(c_info.get("availabilityCount", 0) or c_info.get("availability", 0) or 0)
                                     if count > 0:
                                         if task.seat_class and task.seat_class != "ANY":
                                             if task.seat_class.lower() not in c_name.lower():
                                                 continue
                                         class_breakdown[c_name] = class_breakdown.get(c_name, 0) + count
+                                        car_breakdown.append({
+                                            "class": c_name,
+                                            "car": car_label,
+                                            "count": count
+                                        })
                                         train_seats += count
                         else:
                             for c_info in train.get("cabinClassAvailabilities", []):
                                 c_name_raw = (c_info.get("cabinClass") or {}).get("name", "")
+                                car_raw = c_info.get("trainCarName") or (c_info.get("trainCar") or {}).get("name")
+                                car_label = f"{car_raw}. Araba" if car_raw and str(car_raw).strip().isdigit() else (f"{car_raw}" if car_raw else "")
                                 c_name_upper = c_name_raw.upper()
                                 if "BUSİNESS" in c_name_upper or "BUSINESS" in c_name_upper:
                                     c_name = "Business"
@@ -363,12 +375,17 @@ class TCDDProvider(BaseProvider):
                                     # Only Business and Ekonomi are considered per Ayberk's requirement
                                     continue
 
-                                count = int(c_info.get("availabilityCount", 0) or 0)
+                                count = int(c_info.get("availabilityCount", 0) or c_info.get("availability", 0) or 0)
                                 if count > 0:
                                     if task.seat_class and task.seat_class != "ANY":
                                         if task.seat_class.lower() not in c_name.lower():
                                             continue
                                     class_breakdown[c_name] = class_breakdown.get(c_name, 0) + count
+                                    car_breakdown.append({
+                                        "class": c_name,
+                                        "car": car_label,
+                                        "count": count
+                                    })
                                     train_seats += count
 
                         services.append(ServiceInfo(
@@ -381,8 +398,9 @@ class TCDDProvider(BaseProvider):
                             date=task.date,
                             total_available_seats=train_seats,
                             class_breakdown=class_breakdown,
+                            car_breakdown=car_breakdown,
                             price=price_amount if price_amount > 0 else None,
-                            currency=price_currency if price_amount > 0 else "TRY",
+                            currency=price_currency,
                             booking_url=self.BOOKING_URL,
                             operator="TCDD Taşımacılık",
                             notes=f"Available seats on {dep_time} route" if train_seats > 0 else "Sold Out"
