@@ -92,9 +92,10 @@ class TCDDProvider(BaseProvider):
     
     # Production JWT token list
     JWT_TOKENS = [
-        "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJlVFFicDhDMmpiakp1cnUzQVk2a0ZnV196U29MQXZIMmJ5bTJ2OUg5THhRIn0.eyJleHAiOjE3MzE5MzA5OTcsImlhdCI6MTczMTkzMDkzNywianRpIjoiMzI3NzczN2QtN2E1Mi00MzBiLWJkY2EtNWIxNWE2ODE2NGY3IiwiaXNzIjoiaHR0cDovL3VhdC1yYWlsLmRpdHJhdm8uY29tOjgwODAvcmVhbG1zL21hc3RlciIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiIwMDM0MjcyYy01NzZiLTQ5MGUtYmE5OC01MWQzNzU1Y2FiMDciLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJ0bXMiLCJzZXNzaW9uX3N0YXRlIjoiYzVmODc1YjctNDE3MS00MjY1LTg3YzMtMzU3NTRmYmM2NTY2IiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJkZWZhdWx0LXJvbGVzLW1hc3RlciIsIm9mZmxpbmVfYWNjZXNzIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6Im9wZW5pZCBlbWFpbCBwcm9maWxlIiwic2lkIjoiYzVmODc1YjctNDE3MS00MjY1LTg3YzMtMzU3NTRmYmM2NTY2IiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJ3ZWIiLCJnaXZlbl9uYW1lIjoiIiwiZmFtaWx5X25hbWUiOiIifQ.IxX21XVcRltIDzyjHXlvME1QpKyYM6sI-GxGXlyD7qklr-424MY5DHRRe8JXlY1F5qsI607DQV146MACYuAUXN8jtrfZD2NcK_0QsGis5IA_rue9cVvcvzia-NTV3Ka2B285DpVjOMdFTcsDtxZLRZ0tD6w0A_WzW1KId1lvLsY08UHq6WKvlaDVoa3w3LKC8nDwPSvSMIBWhBpG_5-rxbbf8tpoAfsbJHXVjeOARx5gg713FBwAWzyWrp72SMVozyuwboQrPo4xhPEkwn_V_Ecyp45G3Xe4QOEZpDtbi25fup6xyM4gRq73TCczaErtrP1EQbWgefSgBemldOYLGg",
         "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJlVFFicDhDMmpiakp1cnUzQVk2a0ZnV196U29MQXZIMmJ5bTJ2OUg5THhRIn0.eyJleHAiOjE3MjEzODQ0NzAsImlhdCI6MTcyMTM4NDQxMCwianRpIjoiYWFlNjVkNzgtNmRkZS00ZGY4LWEwZWYtYjRkNzZiYjZlODNjIiwiaXNzIjoiaHR0cDovL3l0cC1wcm9kLW1hc3RlcjEudGNkZHRhc2ltYWNpbGlrLmdvdi50cjo4MDgwL3JlYWxtcy9tYXN0ZXIiLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiMDAzNDI3MmMtNTc2Yi00OTBlLWJhOTgtNTFkMzc1NWNhYjA3IiwidHlwIjoiQmVhcmVyIiwiYXpwIjoidG1zIiwic2Vzc2lvbl9zdGF0ZSI6IjAwYzM4NTJiLTg1YjEtNDMxNS04OGIwLWQ0MWMxMTcyYzA0MSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsiZGVmYXVsdC1yb2xlcy1tYXN0ZXIiLCJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJvcGVuaWQgZW1haWwgcHJvZmlsZSIsInNpZCI6IjAwYzM4NTJiLTg1YjEtNDMxNS04OGIwLWQ0MWMxMTcyYzA0MSIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwicHJlZmVycmVkX3VzZXJuYW1lIjoid2ViIiwiZ2l2ZW5fbmFtZSI6IiIsImZhbWlseV9uYW1lIjoiIn0.AIW_4Qws2wfwxyVg8dgHRT9jB3qNavob2C4mEQIQGl3urzW2jALPx-e51ZwHUb-TXB-X2RPHakonxKnWG6tDIP5aKhiidzXDcr6pDDoYU5DnQhMg1kywyOaMXsjLFjuYN5PAyGUMh6YSOVsg1PzNh-5GrJF44pS47JnB9zk03Pr08napjsZPoRB-5N4GQ49cnx7ePC82Y7YIc-gTew2baqKQPz9_v381Gbm2V38PZDH9KldlcWut7kqQYJFMJ7dkM_entPJn9lFk7R5h5j_06OlQEpWRMQTn9SQ1AYxxmZxBu5XYMKDkn4rzIIVCkdTPJNCt5PvjENjClKFeUA1DOg"
     ]
+    
+    _working_token: Optional[str] = None
 
     @property
     def transport_type(self) -> TransportType:
@@ -238,40 +239,51 @@ class TCDDProvider(BaseProvider):
             "blTrainTypes": ["TURISTIK_TREN"]
         }
 
-        tokens_to_try = list(self.JWT_TOKENS)
+        tokens_to_try = []
         if custom_token:
             clean_tok = custom_token.replace("Bearer ", "").strip()
-            if clean_tok not in tokens_to_try:
-                tokens_to_try.append(clean_tok)
+            tokens_to_try.append(clean_tok)
+        if self._working_token and self._working_token not in tokens_to_try:
+            tokens_to_try.append(self._working_token)
+        for tok in self.JWT_TOKENS:
+            if tok not in tokens_to_try:
+                tokens_to_try.append(tok)
 
         endpoints = [
-            "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/train/train-availability?environment=dev&userId=1"
+            "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/train/train-availability?environment=dev&userId=1",
+            "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/train/train-availability",
+            "https://api-yebsp.tcddtasimacilik.gov.tr/train/train-availability"
         ]
 
         for token in tokens_to_try:
             headers = {
                 "Host": "web-api-prod-ytp.tcddtasimacilik.gov.tr",
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:154.0) Gecko/20100101 Firefox/154.0",
+                "Connection": "keep-alive",
+                "sec-ch-ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
                 "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "tr",
-                "Authorization": token,
                 "Content-Type": "application/json",
+                "unit-id": "3895",
+                "sec-ch-ua-mobile": "?0",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+                "Authorization": token,
+                "sec-ch-ua-platform": '"Windows"',
                 "Origin": "https://ebilet.tcddtasimacilik.gov.tr",
-                "Sec-Fetch-Dest": "empty",
-                "Sec-Fetch-Mode": "cors",
                 "Sec-Fetch-Site": "same-site",
-                "Sec-GPC": "1",
-                "unit-id": "3895"
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Dest": "empty",
+                "Referer": "https://ebilet.tcddtasimacilik.gov.tr/",
+                "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
             }
 
             for endpoint in endpoints:
                 try:
-                    r = requests.post(endpoint, json=payload, headers=headers, timeout=8)
+                    r = requests.post(endpoint, json=payload, headers=headers, timeout=12)
                     if r.status_code == 200:
                         data = r.json()
                         if isinstance(data, (list, dict)) and data:
                             parsed = self._parse_ytp_response(task, data, origin_name, dest_name)
                             if parsed is not None:
+                                self._working_token = token
                                 return parsed
                     elif r.status_code == 429:
                         logger.warning("TCDD sunucusu istek sınırına (rate limit) ulaşıldığını bildirdi.")
@@ -494,22 +506,21 @@ class TCDDProvider(BaseProvider):
 
             checked_trains_summary.append(f"{dep_time} ({train_seats} seats)")
 
-            if train_seats > 0:
-                services.append(ServiceInfo(
-                    service_id=str(sefer.get("seferId") or sefer.get("trenNo", "")),
-                    service_name=train_name,
-                    departure_time=dep_time,
-                    arrival_time=arr_time,
-                    origin=origin_name,
-                    destination=dest_name,
-                    date=task.date,
-                    total_available_seats=train_seats,
-                    class_breakdown=class_breakdown,
-                    booking_url=self.BOOKING_URL,
-                    operator="TCDD Taşımacılık",
-                    notes=f"Found {train_seats} empty seats on {dep_time} route from {origin_name} to {dest_name}"
-                ))
-                total_seats += train_seats
+            services.append(ServiceInfo(
+                service_id=str(sefer.get("seferId") or sefer.get("trenNo", "")),
+                service_name=train_name,
+                departure_time=dep_time,
+                arrival_time=arr_time,
+                origin=origin_name,
+                destination=dest_name,
+                date=task.date,
+                total_available_seats=train_seats,
+                class_breakdown=class_breakdown,
+                booking_url=self.BOOKING_URL,
+                operator="TCDD Taşımacılık",
+                notes=f"Found {train_seats} empty seats on {dep_time} route from {origin_name} to {dest_name}" if train_seats > 0 else "Sold Out"
+            ))
+            total_seats += train_seats
 
         found = total_seats >= task.min_seats
         

@@ -9,8 +9,6 @@ from notifyseat.notifiers.base import BaseNotifier
 from notifyseat.notifiers.desktop import DesktopNotifier
 from notifyseat.notifiers.email import EmailNotifier
 from notifyseat.notifiers.whatsapp import WhatsAppNotifier
-from notifyseat.notifiers.telegram import TelegramNotifier
-from notifyseat.notifiers.discord import DiscordNotifier
 from notifyseat.notifiers.sms import SMSNotifier
 from notifyseat.notifiers.webhook import WebhookNotifier
 
@@ -33,8 +31,6 @@ class NotificationManager:
             "desktop": DesktopNotifier(self.config.desktop),
             "email": EmailNotifier(self.config.email),
             "whatsapp": WhatsAppNotifier(self.config.whatsapp),
-            "telegram": TelegramNotifier(self.config.telegram),
-            "discord": DiscordNotifier(self.config.discord),
             "sms": SMSNotifier(self.config.sms),
             "webhook": WebhookNotifier(self.config.webhook)
         }

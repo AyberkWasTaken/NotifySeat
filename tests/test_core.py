@@ -25,7 +25,7 @@ class TestCore(unittest.TestCase):
             origin="İstanbul(Söğütlüçeşme)",
             destination="Ankara Gar",
             date="2026-09-10",
-            notification_channels=["desktop", "telegram"]
+            notification_channels=["desktop", "whatsapp"]
         )
         saved = self.db.create_task(task)
         self.assertEqual(saved.id, task.id)
@@ -35,19 +35,19 @@ class TestCore(unittest.TestCase):
         self.assertEqual(loaded.origin, "İstanbul(Söğütlüçeşme)")
         self.assertEqual(loaded.destination, "Ankara Gar")
         self.assertEqual(loaded.transport_type, TransportType.TCDD)
-        self.assertEqual(loaded.notification_channels, ["desktop", "telegram"])
+        self.assertEqual(loaded.notification_channels, ["desktop", "whatsapp"])
 
     def test_config_save_load(self):
         cfg = self.cfg_mgr.get()
-        cfg.telegram.enabled = True
-        cfg.telegram.bot_token = "123456:ABC-DEF"
+        cfg.whatsapp.enabled = True
+        cfg.whatsapp.phone_number = "+905551112233"
         cfg.user_name = "Ayberk"
         self.cfg_mgr.save(cfg)
 
         new_mgr = ConfigManager(self.config_path)
         loaded = new_mgr.get()
-        self.assertTrue(loaded.telegram.enabled)
-        self.assertEqual(loaded.telegram.bot_token, "123456:ABC-DEF")
+        self.assertTrue(loaded.whatsapp.enabled)
+        self.assertEqual(loaded.whatsapp.phone_number, "+905551112233")
         self.assertEqual(loaded.user_name, "Ayberk")
 
     def test_stats_and_logs(self):

@@ -1,84 +1,69 @@
-# 🚅 NotifySeat
+# NotifySeat
 
-> **Local-First Public Transport Seat & Cancellation Notifier**  
-> *Instant cancellation radar for TCDD High-Speed Trains, Flights, and Intercity Buses.*
-
-[![PyPI version](https://img.shields.io/pypi/v/notifyseat.svg)](https://pypi.org/project/notifyseat/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/notifyseat.svg)](https://pypi.org/project/notifyseat/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform: Windows | macOS | Linux](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://pypi.org/project/notifyseat/)
-[![Local First](https://img.shields.io/badge/Privacy-100%25%20Local--First-brightgreen)]()
+NotifySeat is a lightweight, local-first background radar that tracks public transport ticket cancellations. When trains, flights, or intercity buses are sold out, NotifySeat watches the availability in the background and alerts you the moment another passenger cancels their ticket and a seat opens up.
 
 ---
 
-**NotifySeat** is a 100% local, privacy-focused seat availability and passenger cancellation radar. When tickets on popular routes are sold out, NotifySeat continuously monitors availability in the background and sends instant multi-channel alerts (Desktop, WhatsApp, Telegram, Discord, Email, SMS) the moment someone cancels their ticket and a seat becomes available.
+## Why NotifySeat?
+
+Popular routes—especially high-speed trains like TCDD YHT between Istanbul and Ankara—frequently sell out days in advance. However, passengers cancel or change their tickets throughout the day. If you catch those openings within minutes, you can easily secure a seat.
+
+Manually refreshing ticketing websites over and over is tedious and time-consuming. NotifySeat automates this entire process:
+
+1. **Zero Cloud Dependencies**: Runs directly on your computer. Your search queries, travel plans, and credentials never leave your machine.
+2. **Multi-Channel Alerts**: Sends instant alerts via native desktop notifications, audio chimes, WhatsApp messages, or email.
+3. **Dual Interface**: Includes both an interactive terminal wizard and a clean web dashboard that runs locally in your browser.
+4. **Smart Radar Engine**: Built with polite polling intervals and randomized jitter to protect your IP from rate limits.
 
 ---
 
-## 🌟 Key Features
+## Installation
 
-- 🚆 **Multi-Transport Support**:
-  - **TCDD Trains (YHT & Mainline)**: Real-time EYBİS integration with wagon and class breakdown (Pulman, Business, Yataklı).
-  - **Flights**: Monitors Pegasus Airlines, Turkish Airlines (THY), AJet, and SunExpress with direct booking links.
-  - **Intercity Buses**: Tracks seat openings across Pamukkale, Kamil Koç, Metro, and Obilet.
-  - **Simulation & Test Engine**: Built-in simulator to test and verify cancellation alerts instantly.
-- 🔔 **Multi-Channel Instant Notifications**:
-  - **Desktop / OS Native**: Windows Toast Notifications, macOS AppleScript alerts, Linux `notify-send`, and audible audio chimes.
-  - **WhatsApp**: Instant messages sent directly to your phone.
-  - **Telegram Bot**: Rich alerts with inline booking buttons.
-  - **Discord Webhook**: Embedded rich cards with route details and seat counts.
-  - **SMTP Email**: Formatted HTML & plain text alerts (Gmail, Outlook, custom SMTP).
-  - **SMS**: Netgsm and Twilio API support.
-  - **Custom Webhooks**: JSON payloads for Home Assistant, Zapier, IFTTT, n8n.
-- 💻 **Dual Interface**:
-  - **Modern Local Web GUI**: Glassmorphic dashboard with live Server-Sent Events (SSE) updates, audio synthesis alerts, and graphical task manager.
-  - **Rich Interactive CLI**: Terminal wizard, colored status tables, and live scan logs.
-- 🛡️ **Anti-Ban & Smart Jitter**: Randomized polling intervals and human-like request headers to avoid rate limits.
-- 🔒 **100% Local-First & Private**: Runs entirely on your computer. Zero cloud server fees, zero telemetry, and your search routes/credentials never leave your machine.
-
----
-
-## 🚀 Quick Start
-
-### 1. Installation
-
-Install globally via `pip`:
+Install NotifySeat using pip:
 
 ```bash
 pip install --upgrade notifyseat
 ```
 
-*Or install from source:*
+If you prefer to install from source:
 
 ```bash
-git clone https://github.com/ayberk/NotifySeat.git
+git clone https://github.com/AyberkWasTaken/NotifySeat.git
 cd NotifySeat
 pip install -e .
 ```
 
 ---
 
-### 2. Launch the Local Web GUI Dashboard
+## Getting Started
 
-NotifySeat includes a built-in local web dashboard:
+You can use NotifySeat either through your web browser or directly from your terminal.
+
+### 1. Web Dashboard (Recommended)
+
+To start the local web interface:
 
 ```bash
 notifyseat gui
 ```
 
-Open **`http://127.0.0.1:8080`** in your browser to manage routes, configure notifications, and view real-time radar scans.
+This launches a local dashboard at `http://127.0.0.1:8080` in your default browser. From the dashboard, you can:
+- Add new transport routes to monitor
+- View live availability and train wagon details in real-time
+- Configure WhatsApp and email notification channels
+- Pause, resume, or delete tracking tasks
 
----
+### 2. Interactive Terminal Wizard
 
-### 3. Interactive CLI Wizard
-
-Create a tracking route in seconds using the interactive terminal wizard:
+If you prefer the command line, launch the interactive step-by-step wizard:
 
 ```bash
 notifyseat track -i
 ```
 
-Start the background monitoring engine:
+The wizard will guide you through picking the transport type (TCDD train, flight, or bus), selecting your departure and arrival stations, choosing the date, and selecting your preferred time window.
+
+Once your route is created, start the background monitoring engine:
 
 ```bash
 notifyseat run
@@ -86,84 +71,81 @@ notifyseat run
 
 ---
 
-## 🖥️ CLI Commands Reference
+## Supported Transport Services
 
-| Command | Description |
-|---|---|
-| `notifyseat gui [--port 8080]` | Launch the local Web GUI dashboard |
-| `notifyseat track -i` | Launch interactive wizard to add a new route to monitor |
-| `notifyseat track --from "İstanbul" --to "Ankara" --date 2026-09-15` | Add a tracking task directly via arguments |
-| `notifyseat list` | List all monitored routes and their current status |
-| `notifyseat check [task_id]` | Trigger an immediate live scan for a specific route (or all) |
-| `notifyseat run` / `notifyseat start` | Start the background monitoring engine |
-| `notifyseat logs` / `notifyseat history` | View recent scan logs and seat findings |
-| `notifyseat config` | Interactive setup wizard for WhatsApp and Email notifications |
-| `notifyseat test-notify [channel]` | Test alerts (`desktop`, `whatsapp`, `telegram`, `discord`, `email`, `sms`) |
-| `notifyseat pause <task_id>` | Pause monitoring for a route |
-| `notifyseat resume <task_id>` | Resume monitoring for a route |
-| `notifyseat delete <task_id>` | Delete a tracking route |
+### TCDD Trains (YHT and Mainline)
+Direct integration with the TCDD ticketing system. Supports both High-Speed Trains (YHT) and mainline regional trains. Provides detailed seat counts broken down by wagon class (Economy, Business, and Sleeper / Yatakli).
 
 ---
 
-## ⚙️ Notification Channels Setup
+## Notification Channels
 
-Configuration is stored securely on your local disk at `~/.notifyseat/config.json` (and SQLite database at `~/.notifyseat/notifyseat.db`). You can configure them via the **Web GUI Settings** or CLI:
+NotifySeat can notify you through three main channels:
 
-### 📱 WhatsApp Setup:
-1. Run `notifyseat config` or open **Web GUI Settings**.
-2. Follow the 1-click prompt to activate the free CallMeBot WhatsApp gateway.
-3. Enter your phone number and API key.
+### 1. Native Desktop Notifications and Audio Chimes
+Works out of the box on Windows, macOS, and Linux without any additional setup. When a seat is detected, NotifySeat displays a system notification banner and plays an audible chime.
 
-### ✈️ Telegram Bot Setup:
-1. Create a bot with [@BotFather](https://t.me/BotFather) on Telegram and get your Bot Token.
-2. Obtain your Chat ID using [@userinfobot](https://t.me/userinfobot).
-3. Set your token and chat ID in the Web GUI or `~/.notifyseat/config.json`:
-   ```json
-   "telegram": {
-     "enabled": true,
-     "bot_token": "YOUR_BOT_TOKEN",
-     "chat_id": "YOUR_CHAT_ID"
-   }
-   ```
-4. Test with: `notifyseat test-notify telegram`
+You can test desktop alerts with:
+```bash
+notifyseat test-notify desktop
+```
 
-### 🎮 Discord Webhook Setup:
-1. In Discord: **Server Settings** ➔ **Integrations** ➔ **Webhooks** ➔ **New Webhook**.
-2. Copy the Webhook URL and save it via the Web GUI or `config.json`.
-3. Test with: `notifyseat test-notify discord`
+### 2. WhatsApp
+Receive instant text messages directly on your phone the second a seat opens up. NotifySeat uses the free CallMeBot gateway for WhatsApp delivery.
 
-### 📧 Email Setup (Gmail / SMTP):
-1. For Gmail: Generate an [App Password](https://myaccount.google.com/apppasswords).
-2. Configure SMTP host (`smtp.gmail.com`), port (`587`), email address, and App Password in Web GUI.
-3. Test with: `notifyseat test-notify email`
+To set up WhatsApp:
+1. Run `notifyseat config` in your terminal or open the Settings tab in the Web GUI.
+2. Follow the prompt to activate the free bot gateway on WhatsApp.
+3. Save your phone number and API key.
 
----
+You can test WhatsApp delivery with:
+```bash
+notifyseat test-notify whatsapp
+```
 
-## 🏗️ Architecture
+### 3. Email (SMTP)
+Receive formatted email alerts containing route information, available seat counts, and direct booking links. Works with Gmail, Outlook, or any standard SMTP server.
 
-```text
-notifyseat/
-├── core/             # Data models, SQLite database layer, configuration manager, logger
-├── notifiers/        # Desktop, WhatsApp, Telegram, Discord, Email, SMS, Webhook
-├── providers/        # TCDD Train (EYBİS), Flight (THY/Pegasus/AJet), Bus, Simulator
-├── engine/           # Multi-threaded background scheduler, backoff logic, and worker
-├── cli/              # Rich interactive terminal application and command parser
-├── web/              # Local HTTP Web Dashboard & REST API
-│   ├── static/       # CSS stylesheets & client JavaScript (Live SSE, Web Audio)
-│   └── templates/    # HTML5 Single Page Dashboard
-└── tests/            # Automated test suite
+To use Gmail:
+1. Generate an App Password in your Google Account security settings.
+2. Enter your email address and App Password in the Web GUI Settings.
+
+You can test email delivery with:
+```bash
+notifyseat test-notify email
 ```
 
 ---
 
-## 🔒 Privacy & Local-First Philosophy
+## Command Reference
 
-- **Zero Cloud Infrastructure**: Runs 100% locally on your computer.
-- **No Recurring Fees**: Free and open source forever.
-- **Zero Telemetry / Data Collection**: Your search queries, passenger information, and notification credentials never leave your personal machine.
+| Command | Description |
+|---|---|
+| `notifyseat gui` | Starts the local web dashboard server |
+| `notifyseat track -i` | Opens the interactive route setup wizard |
+| `notifyseat track --from "Istanbul" --to "Ankara" --date 2026-09-15` | Adds a route to track via command-line flags |
+| `notifyseat list` | Lists all active and paused tracking routes |
+| `notifyseat check [task_id]` | Triggers an immediate live check for routes |
+| `notifyseat run` | Starts the background monitoring radar |
+| `notifyseat logs` | Displays recent scan logs and seat findings |
+| `notifyseat config` | Opens the notification setup assistant |
+| `notifyseat test-notify [channel]` | Tests an alert channel (`desktop`, `whatsapp`, `email`) |
+| `notifyseat pause <task_id>` | Pauses a specific tracking task |
+| `notifyseat resume <task_id>` | Resumes a paused tracking task |
+| `notifyseat delete <task_id>` | Deletes a tracking task |
 
 ---
 
-## 📄 License
+## Configuration and Storage
 
-Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
+All application settings, search tasks, and scan logs are stored locally in your home directory:
+- Configuration: `~/.notifyseat/config.json`
+- Local Database: `~/.notifyseat/notifyseat.db`
+
+No external databases or server processes are required.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

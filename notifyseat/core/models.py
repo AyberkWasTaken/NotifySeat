@@ -32,8 +32,7 @@ class TaskStatus(str, Enum):
 
 class NotificationChannel(str, Enum):
     DESKTOP = "desktop"
-    TELEGRAM = "telegram"
-    DISCORD = "discord"
+    WHATSAPP = "whatsapp"
     EMAIL = "email"
     SMS = "sms"
     WEBHOOK = "webhook"

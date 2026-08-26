@@ -221,7 +221,10 @@ def cmd_run(db: Database, config_mgr: ConfigManager, args: argparse.Namespace):
         db.create_task(demo_task)
         tasks = [demo_task]
 
-    print(f"\n[bold green]Starting NotifySeat Engine... Monitoring {len(tasks)} active route(s) (~1.5-minute smart cycle with anti-ban jitter)[/bold green]" if HAS_RICH else f"Starting NotifySeat Engine for {len(tasks)} tasks...")
+    if HAS_RICH and console:
+        console.print(f"\n[bold green]Starting NotifySeat Engine... Monitoring {len(tasks)} active route(s) (~1.5-minute smart cycle with anti-ban jitter)[/bold green]")
+    else:
+        print(f"\nStarting NotifySeat Engine... Monitoring {len(tasks)} active route(s)...")
     print("Press Ctrl+C at any time to exit gracefully.\n")
 
     def on_event(event_type: str, data: dict):
@@ -418,7 +421,7 @@ def main():
 
     # test-notify
     test_p = subparsers.add_parser("test-notify", help="Test active notification channels")
-    test_p.add_argument("channel", nargs="?", default=None, choices=["desktop", "email", "whatsapp", "telegram", "discord"], help="Optional specific channel to test")
+    test_p.add_argument("channel", nargs="?", default=None, choices=["desktop", "email", "whatsapp", "sms"], help="Optional specific channel to test")
 
     # delete
     del_p = subparsers.add_parser("delete", help="Delete a tracking task")

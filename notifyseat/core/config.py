@@ -22,19 +22,6 @@ class EmailConfig:
 
 
 @dataclass
-class TelegramConfig:
-    enabled: bool = False
-    bot_token: str = ""
-    chat_id: str = ""
-
-
-@dataclass
-class DiscordConfig:
-    enabled: bool = False
-    webhook_url: str = ""
-
-
-@dataclass
 class WhatsAppConfig:
     enabled: bool = False
     phone_number: str = ""
@@ -70,8 +57,6 @@ class WebhookConfig:
 class AppConfig:
     email: EmailConfig = field(default_factory=EmailConfig)
     whatsapp: WhatsAppConfig = field(default_factory=WhatsAppConfig)
-    telegram: TelegramConfig = field(default_factory=TelegramConfig)
-    discord: DiscordConfig = field(default_factory=DiscordConfig)
     desktop: DesktopConfig = field(default_factory=DesktopConfig)
     sms: SMSConfig = field(default_factory=SMSConfig)
     webhook: WebhookConfig = field(default_factory=WebhookConfig)
@@ -85,8 +70,6 @@ class AppConfig:
         return {
             "email": asdict(self.email),
             "whatsapp": asdict(self.whatsapp),
-            "telegram": asdict(self.telegram),
-            "discord": asdict(self.discord),
             "desktop": asdict(self.desktop),
             "sms": asdict(self.sms),
             "webhook": asdict(self.webhook),
@@ -104,10 +87,6 @@ class AppConfig:
             cfg.email = EmailConfig(**data["email"])
         if "whatsapp" in data:
             cfg.whatsapp = WhatsAppConfig(**data["whatsapp"])
-        if "telegram" in data:
-            cfg.telegram = TelegramConfig(**data["telegram"])
-        if "discord" in data:
-            cfg.discord = DiscordConfig(**data["discord"])
         if "desktop" in data:
             cfg.desktop = DesktopConfig(**data["desktop"])
         if "sms" in data:
@@ -140,7 +119,11 @@ class ConfigManager:
             try:
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    return AppConfig.from_dict(data)
+                    cfg = AppConfig.from_dict(data)
+                    if cfg.default_check_interval >= 300:
+                        cfg.default_check_interval = 90
+                        self.save(cfg)
+                    return cfg
             except Exception:
                 return AppConfig()
         cfg = AppConfig()

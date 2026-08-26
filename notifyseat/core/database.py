@@ -41,7 +41,7 @@ class Database:
                     time_filter TEXT,
                     min_seats INTEGER DEFAULT 1,
                     seat_class TEXT DEFAULT 'ANY',
-                    check_interval_seconds INTEGER DEFAULT 30,
+                    check_interval_seconds INTEGER DEFAULT 90,
                     notification_channels TEXT DEFAULT '["desktop"]',
                     status TEXT DEFAULT 'active',
                     last_checked_at TEXT,
@@ -92,6 +92,9 @@ class Database:
                     if old_id != new_id:
                         cursor.execute("UPDATE tasks SET id = ? WHERE id = ?", (new_id, old_id))
                         cursor.execute("UPDATE check_logs SET task_id = ? WHERE task_id = ?", (new_id, old_id))
+
+            # Migration: Ensure existing tasks with legacy 300s (5-min) interval are updated to 90s (1.5-min)
+            cursor.execute("UPDATE tasks SET check_interval_seconds = 90 WHERE check_interval_seconds >= 300 OR check_interval_seconds IS NULL")
 
             conn.commit()
 

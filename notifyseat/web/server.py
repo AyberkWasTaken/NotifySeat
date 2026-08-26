@@ -168,10 +168,6 @@ class NotifySeatHTTPHandler(http.server.BaseHTTPRequestHandler):
                 current_cfg["email"].update(body["email"])
             if "desktop" in body:
                 current_cfg["desktop"].update(body["desktop"])
-            if "telegram" in body:
-                current_cfg["telegram"].update(body["telegram"])
-            if "discord" in body:
-                current_cfg["discord"].update(body["discord"])
             
             from notifyseat.core.config import AppConfig
             new_cfg = AppConfig.from_dict(current_cfg)
