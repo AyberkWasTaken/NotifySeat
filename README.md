@@ -19,13 +19,20 @@ Manually refreshing ticketing websites over and over is tedious and time-consumi
 
 ## Installation
 
-Install NotifySeat using pip:
+### Using pipx (Recommended for Linux and macOS)
+`pipx` installs CLI tools in isolated environments and makes them globally accessible:
+
+```bash
+pipx install notifyseat
+```
+
+### Using pip (Windows or Virtual Environments)
 
 ```bash
 pip install --upgrade notifyseat
 ```
 
-If you prefer to install from source:
+*Or install directly from source:*
 
 ```bash
 git clone https://github.com/AyberkWasTaken/NotifySeat.git
