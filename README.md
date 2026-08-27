@@ -1,6 +1,6 @@
 # NotifySeat
 
-NotifySeat is a lightweight, local-first background radar that tracks public transport ticket cancellations. When trains, flights, or intercity buses are sold out, NotifySeat watches the availability in the background and alerts you the moment another passenger cancels their ticket and a seat opens up.
+NotifySeat is a lightweight, local-first background radar that tracks TCDD train ticket cancellations. When trains are sold out, NotifySeat watches the availability in the background and alerts you the moment another passenger cancels their ticket and a seat opens up.
 
 ---
 
