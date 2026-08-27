@@ -54,6 +54,8 @@ To start the local web interface:
 notifyseat gui
 ```
 
+![NotifySeat Web GUI Dashboard](docs/screenshots/gui_preview.png)
+
 This launches a local dashboard at `http://127.0.0.1:8080` in your default browser. From the dashboard, you can:
 - Add new transport routes to monitor
 - View live availability and train wagon details in real-time
@@ -67,6 +69,8 @@ If you prefer the command line, launch the interactive step-by-step wizard:
 ```bash
 notifyseat track -i
 ```
+
+![NotifySeat CLI Terminal Interface](docs/screenshots/cli_preview.png)
 
 The wizard will guide you through picking the transport type (TCDD train, flight, or bus), selecting your departure and arrival stations, choosing the date, and selecting your preferred time window.
 
