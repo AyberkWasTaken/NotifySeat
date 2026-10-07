@@ -34,7 +34,7 @@ class EngineScheduler:
         self._was_in_backoff: bool = False
 
     def subscribe_events(self, callback: Callable[[str, Dict[str, Any]], None]):
-        """Subscribe to real-time engine events (for CLI monitor and Web GUI live stream)."""
+        """Subscribe to real-time engine events (for CLI monitor and event streams)."""
         self._event_subscribers.append(callback)
 
     def _handle_worker_event(self, event_type: str, data: Dict[str, Any]):

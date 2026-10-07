@@ -93,7 +93,7 @@ def cmd_track(db: Database, args: argparse.Namespace):
         task = interactive_create_task()
         if task:
             db.create_task(task)
-            print(f"✔ Task [{task.id}] saved to database! Run 'notifyseat run' or launch 'notifyseat gui' to monitor.")
+            print(f"✔ Task [{task.id}] saved to database! Run 'notifyseat run' to monitor.")
     else:
         channels = args.channels.split(",") if args.channels else ["desktop"]
         task = TrackingTask(
@@ -102,7 +102,7 @@ def cmd_track(db: Database, args: argparse.Namespace):
             destination=args.destination,
             date=args.date or (datetime.now() + timedelta(days=1)).strftime("%d-%m-%Y"),
             time_filter=args.time,
-            check_interval_seconds=args.interval or 90,
+            check_interval_seconds=getattr(args, "interval", 90) or 90,
             notification_channels=channels,
             status=TaskStatus.ACTIVE
         )
@@ -396,6 +396,7 @@ def main():
     track_p.add_argument("--date", help="Travel date (YYYY-MM-DD)")
     track_p.add_argument("--time", help="Time filter (e.g. morning, afternoon, evening, all)")
     track_p.add_argument("--channels", default="desktop", help="Comma-separated channels: desktop,email,whatsapp")
+    track_p.add_argument("--interval", type=int, default=90, help="Check interval in seconds (default 90)")
 
     # check
     chk_p = subparsers.add_parser("check", help="Trigger an immediate live check for a task (or all active tasks)")
@@ -413,11 +414,6 @@ def main():
     # config / notify-setup
     subparsers.add_parser("config", help="Configure Email and WhatsApp alerts (auto-opens browser)")
     subparsers.add_parser("notify-setup", help="Alias for config")
-
-    # gui
-    gui_p = subparsers.add_parser("gui", help="Launch the local Web GUI dashboard")
-    gui_p.add_argument("--host", default="127.0.0.1", help="Host address (default 127.0.0.1)")
-    gui_p.add_argument("--port", type=int, default=8080, help="Port number (default 8080)")
 
     # test-notify
     test_p = subparsers.add_parser("test-notify", help="Test active notification channels")
@@ -449,7 +445,6 @@ def main():
         print("  notifyseat list          ➔ View all configured routes")
         print("  notifyseat config        ➔ Setup WhatsApp & Email alerts (auto-opens browser)")
         print("  notifyseat test-notify   ➔ Test WhatsApp, Email, Desktop alerts")
-        print("  notifyseat gui           ➔ Launch the local Web GUI dashboard")
         print("  notifyseat delete <id>   ➔ Delete a task")
         print("  notifyseat pause <id>    ➔ Pause monitoring for a task")
         print("  notifyseat resume <id>   ➔ Resume monitoring for a task\n")
@@ -485,9 +480,6 @@ def main():
                 print(f"✔ Task [{args.task_id}] resumed.")
             else:
                 print(f"✖ Task [{args.task_id}] not found.")
-        elif args.command == "gui":
-            from notifyseat.web.server import run_web_server
-            run_web_server(host=args.host, port=args.port)
     except KeyboardInterrupt:
         print("\n\n\033[2mOperation cancelled.\033[0m\n")
         sys.exit(0)

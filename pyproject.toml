@@ -42,10 +42,3 @@ Homepage = "https://github.com/ayberk/NotifySeat"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["notifyseat*"]
-
-[tool.setuptools.package-data]
-"notifyseat.web" = [
-    "templates/*.html",
-    "static/css/*.css",
-    "static/js/*.js"
-]

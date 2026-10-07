@@ -2,8 +2,8 @@
 import urllib.request
 import json
 import re
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional, Tuple
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from notifyseat.providers.base import BaseProvider
 from notifyseat.core.models import TrackingTask, CheckResult, TransportType, ServiceInfo
@@ -74,6 +74,36 @@ def tr_upper(text: str) -> str:
     if not text:
         return ""
     return text.replace("i", "İ").replace("ı", "I").upper()
+
+
+def tcdd_utc_to_local(iso_ts: Any) -> Tuple[str, str]:
+    """
+    Converts a TCDD UTC timestamp (e.g. '2026-10-10T06:20:00' or epoch ms) into Europe/Istanbul local time (UTC+3).
+    Returns (date_str: 'YYYY-MM-DD', time_str: 'HH:MM').
+    """
+    if not iso_ts:
+        return "", ""
+    if isinstance(iso_ts, (int, float)):
+        try:
+            dt = datetime.fromtimestamp(iso_ts / 1000.0, timezone.utc) if iso_ts > 100000000000 else datetime.fromtimestamp(iso_ts, timezone.utc)
+            dt_local = dt + timedelta(hours=3)
+            return dt_local.strftime("%Y-%m-%d"), dt_local.strftime("%H:%M")
+        except Exception:
+            return "", ""
+
+    clean = str(iso_ts).strip().replace("Z", "")
+    try:
+        if "T" in clean:
+            dt = datetime.fromisoformat(clean)
+        elif " " in clean:
+            dt = datetime.strptime(clean[:19], "%Y-%m-%d %H:%M:%S")
+        else:
+            return "", clean[:5]
+        # TCDD backend stores timestamps in UTC. Turkey is permanently UTC+3.
+        dt_local = dt + timedelta(hours=3)
+        return dt_local.strftime("%Y-%m-%d"), dt_local.strftime("%H:%M")
+    except Exception:
+        return "", clean[:5]
 
 
 class TCDDProvider(BaseProvider):
@@ -179,8 +209,39 @@ class TCDDProvider(BaseProvider):
 
         # Call live TCDD YTP API
         result = self._check_via_ytp_api(task, origin_name, dest_name, origin_id, dest_id, custom_token=custom_token)
-        if result is not None:
+        if result is not None and result.services:
             return result
+
+        # Fallback to timetable + live seat availability query
+        scheduled = self.get_scheduled_trains(origin_name, dest_name, task.date)
+        if scheduled:
+            if task.time_filter:
+                scheduled = [s for s in scheduled if self._match_time_filter(s.departure_time, task.time_filter)]
+            if scheduled:
+                if task.seat_class and task.seat_class != "ANY":
+                    for s in scheduled:
+                        s.total_available_seats = sum(
+                            cnt for c_name, cnt in s.class_breakdown.items()
+                            if task.seat_class.lower() in c_name.lower()
+                        )
+
+                total_seats = sum(s.total_available_seats for s in scheduled)
+                open_services = [s for s in scheduled if s.total_available_seats >= (task.min_seats or 1)]
+                found = len(open_services) > 0
+                if found:
+                    descriptions = [f"{s.total_available_seats} empty seats on {s.departure_time} route" for s in open_services]
+                    msg = f"Found {', '.join(descriptions)}."
+                else:
+                    msg = "All checked routes are sold out."
+
+                return CheckResult(
+                    task_id=task.id,
+                    success=True,
+                    found=found,
+                    seats_count=total_seats,
+                    services=scheduled,
+                    message=msg
+                )
 
         # Failure when API returns no response or route not found
         return CheckResult(
@@ -548,19 +609,295 @@ class TCDDProvider(BaseProvider):
             message=msg
         )
 
-    def get_scheduled_trains(self, origin: str, destination: str, date: str) -> List[ServiceInfo]:
-        """Fetches all scheduled train services for a given route and date."""
-        temp_task = TrackingTask(
-            origin=origin,
-            destination=destination,
-            date=date,
-            time_filter=None,
-            min_seats=1
-        )
-        res = self.check_route(temp_task)
-        if res and res.services:
-            return sorted(res.services, key=lambda s: s.departure_time or "")
+    def get_trains_by_station_and_date(self, station_id: int, date_str: str) -> List[Dict[str, Any]]:
+        """Queries TCDD load-trains-by-station-and-date endpoint for all scheduled trains passing through station."""
+        import requests
+        from notifyseat.core.config import ConfigManager
+
+        iso_date = str(date_str).strip()
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%Y"):
+            try:
+                iso_date = datetime.strptime(str(date_str).strip(), fmt).strftime("%Y-%m-%d")
+                break
+            except Exception:
+                pass
+
+        url = "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/train/load-trains-by-station-and-date"
+        headers = {
+            "Host": "web-api-prod-ytp.tcddtasimacilik.gov.tr",
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            "unit-id": "3895",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Authorization": self.JWT_TOKENS[0],
+            "Origin": "https://ebilet.tcddtasimacilik.gov.tr",
+            "Referer": "https://ebilet.tcddtasimacilik.gov.tr/"
+        }
+        cfg = ConfigManager().get()
+        if hasattr(cfg, "tcdd_token") and cfg.tcdd_token:
+            headers["Authorization"] = cfg.tcdd_token
+
+        try:
+            r = requests.post(url, json={"stationId": station_id, "date": iso_date}, headers=headers, timeout=12)
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, list):
+                    return data
+        except Exception as e:
+            logger.debug(f"Failed to load trains for station {station_id}: {e}")
         return []
+
+    def get_seat_availability_for_train(
+        self,
+        train_id: int,
+        from_station_id: int,
+        to_station_id: int
+    ) -> Tuple[int, Dict[str, int], List[Dict[str, Any]], Optional[float], str]:
+        """
+        Queries official TCDD /tms/seat-maps/load-by-train-id endpoint to fetch real-time
+        available seat counts, cabin class breakdown, wagon/car details, and min price.
+        Returns: (total_seats, class_breakdown, car_breakdown, min_price, currency)
+        """
+        import requests
+        from notifyseat.core.config import ConfigManager
+
+        headers = {
+            "Host": "web-api-prod-ytp.tcddtasimacilik.gov.tr",
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            "unit-id": "3895",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Authorization": self.JWT_TOKENS[0],
+            "Origin": "https://ebilet.tcddtasimacilik.gov.tr",
+            "Referer": "https://ebilet.tcddtasimacilik.gov.tr/"
+        }
+        cfg = ConfigManager().get()
+        if hasattr(cfg, "tcdd_token") and cfg.tcdd_token:
+            headers["Authorization"] = cfg.tcdd_token
+
+        payload = {
+            "trainId": train_id,
+            "fromStationId": from_station_id,
+            "toStationId": to_station_id
+        }
+
+        total_seats = 0
+        class_bd: Dict[str, int] = {}
+        car_bd: List[Dict[str, Any]] = []
+        min_price: Optional[float] = None
+        curr = "TRY"
+
+        try:
+            r = requests.post(
+                "https://web-api-prod-ytp.tcddtasimacilik.gov.tr/tms/seat-maps/load-by-train-id",
+                json=payload,
+                headers=headers,
+                timeout=8
+            )
+            if r.status_code == 200:
+                data = r.json()
+                for sm in data.get("seatMaps", []):
+                    c_info = sm.get("seatMapTemplate", {}).get("car", {})
+                    car_name = c_info.get("name", "")
+                    raw_count = int(sm.get("availableSeatCount", 0) or 0)
+
+                    allocated_seats = {
+                        s.get("seatNumber")
+                        for s in sm.get("allocationSeats", [])
+                        if s.get("seatNumber")
+                    }
+                    seat_prices = sm.get("seatPrices", [])
+
+                    if seat_prices:
+                        seat_map_by_num = {}
+                        for sp in seat_prices:
+                            num = sp.get("seatNumber")
+                            if num and num not in seat_map_by_num:
+                                seat_map_by_num[num] = sp
+
+                        free_seats = [
+                            sp for num, sp in seat_map_by_num.items()
+                            if num not in allocated_seats
+                        ]
+                        normal_free = [
+                            s for s in free_seats
+                            if s.get("cabinClassId") not in (12, 13)
+                            and not str(s.get("seatNumber", "")).endswith("H")
+                            and "ENGELL" not in str(s.get("seatNumber", "")).upper()
+                        ]
+                        count = len(normal_free)
+                    else:
+                        count = raw_count
+
+                    cls_name_raw = (sm.get("cabinClass") or {}).get("name") or sm.get("seatMapTemplate", {}).get("name", "")
+                    c_upper = cls_name_raw.upper()
+                    if "BUSİNESS" in c_upper or "BUSINESS" in c_upper:
+                        c_name = "Business"
+                    elif "EKONOMİ" in c_upper or "EKONOMI" in c_upper or "PULMAN" in c_upper:
+                        c_name = "Ekonomi"
+                    else:
+                        c_name = "Ekonomi"
+
+                    if count > 0:
+                        class_bd[c_name] = class_bd.get(c_name, 0) + count
+                        total_seats += count
+                        car_bd.append({
+                            "class": c_name,
+                            "car": car_name,
+                            "count": count
+                        })
+
+                    # Track min price
+                    sm_min = sm.get("minPrice")
+                    if isinstance(sm_min, dict):
+                        p_val = float(sm_min.get("priceAmount", 0.0) or 0.0)
+                        if p_val > 0:
+                            min_price = min(min_price, p_val) if min_price else p_val
+                            curr = sm_min.get("priceCurrency") or curr
+
+                    for sp in seat_prices:
+                        p_raw = sp.get("price")
+                        if isinstance(p_raw, dict):
+                            p = float(p_raw.get("priceAmount", 0.0) or 0.0)
+                            if p > 0:
+                                min_price = min(min_price, p) if min_price else p
+                                curr = p_raw.get("priceCurrency") or curr
+                        elif isinstance(p_raw, (int, float)):
+                            p = float(p_raw)
+                            if p > 0:
+                                min_price = min(min_price, p) if min_price else p
+
+        except Exception as e:
+            logger.debug(f"Seat map fetch failed for train {train_id}: {e}")
+
+        return total_seats, class_bd, car_bd, min_price, curr
+
+    def get_scheduled_trains(self, origin: str, destination: str, date: str) -> List[ServiceInfo]:
+        """Fetches all scheduled train services for a given route and date using TCDD official timetable."""
+        origin_station = self.get_station_by_name(origin)
+        dest_station = self.get_station_by_name(destination)
+        if not origin_station or not dest_station:
+            return []
+
+        # 1. Try checking via live availability API if working token is cached
+        if self._working_token:
+            temp_task = TrackingTask(
+                origin=origin,
+                destination=destination,
+                date=date,
+                time_filter=None,
+                min_seats=1
+            )
+            avail_res = self._check_via_ytp_api(
+                temp_task,
+                origin_station["name"],
+                dest_station["name"],
+                int(origin_station["id"]),
+                int(dest_station["id"])
+            )
+            if avail_res and avail_res.services:
+                return sorted(avail_res.services, key=lambda s: s.departure_time or "")
+
+        # 2. Query timetable directly via /tms/train/load-trains-by-station-and-date
+        orig_id = int(origin_station["id"])
+        dest_id = int(dest_station["id"])
+        trains_orig = self.get_trains_by_station_and_date(orig_id, date)
+        trains_dest = self.get_trains_by_station_and_date(dest_id, date)
+
+        dest_map = {t["trainNumber"]: t for t in trains_dest if "trainNumber" in t}
+        dest_name_clean = normalize_tr(dest_station["name"])
+
+        candidate_items = []
+        seen_train_nums = set()
+
+        for t in trains_orig:
+            t_num = str(t.get("trainNumber") or t.get("trainId") or "").strip()
+            if not t_num or t_num in seen_train_nums:
+                continue
+
+            # Skip trains terminating at origin or originating at destination
+            if t.get("lineEndStationId") == orig_id or t.get("lineStartStationId") == dest_id:
+                continue
+
+            orig_is_start = (t.get("stationInfo") == "departure_station" or t.get("lineStartStationId") == orig_id)
+            if orig_is_start:
+                dep_raw = t.get("tsDepartureTime") or t.get("lineStartDepartureTime")
+            else:
+                dep_raw = t.get("tsArrivalTime") or t.get("tsDepartureTime")
+
+            _, dep_time = tcdd_utc_to_local(dep_raw)
+
+            arr_time = ""
+            matched = False
+
+            # Check if train appears at destination with valid sequence
+            if t_num in dest_map:
+                dt = dest_map[t_num]
+                arr_raw = dt.get("tsArrivalTime") or dt.get("lineEndArrivalTime")
+                if dep_raw and arr_raw:
+                    _, arr_t_val = tcdd_utc_to_local(arr_raw)
+                    if arr_raw <= dep_raw and t.get("lineEndStationId") != dest_id:
+                        continue
+                    matched = True
+                    arr_time = arr_t_val
+
+            # Or train terminates directly at destination station
+            if not matched and t.get("lineEndStationId") == dest_id:
+                matched = True
+                arr_raw = t.get("lineEndArrivalTime") or t.get("tsArrivalTime")
+                _, arr_time = tcdd_utc_to_local(arr_raw)
+
+            # Or line name explicitly indicates travel towards destination
+            if not matched and dest_name_clean in normalize_tr(t.get("lineName") or ""):
+                matched = True
+                arr_raw = t.get("lineEndArrivalTime") or t.get("tsArrivalTime")
+                _, arr_time = tcdd_utc_to_local(arr_raw)
+
+            if matched:
+                seen_train_nums.add(t_num)
+                candidate_items.append((t, t_num, dep_time, arr_time))
+
+        services: List[ServiceInfo] = []
+        if candidate_items:
+            from concurrent.futures import ThreadPoolExecutor
+
+            def _fetch_candidate_seats(item):
+                t_obj, t_num_val, dep_t_val, arr_t_val = item
+                train_id = t_obj.get("trainId")
+                if train_id:
+                    tot, cls_bd, car_bd, min_p, curr = self.get_seat_availability_for_train(
+                        int(train_id), orig_id, dest_id
+                    )
+                else:
+                    tot, cls_bd, car_bd, min_p, curr = 0, {}, [], None, "TRY"
+                return (item, tot, cls_bd, car_bd, min_p, curr)
+
+            workers = min(len(candidate_items), 8)
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                results = list(executor.map(_fetch_candidate_seats, candidate_items))
+
+            for item, tot, cls_bd, car_bd, min_p, curr in results:
+                t_obj, t_num_val, dep_t_val, arr_t_val = item
+                train_name = t_obj.get("trainName") or f"YHT {t_num_val}"
+                services.append(ServiceInfo(
+                    service_id=t_num_val,
+                    service_name=train_name,
+                    departure_time=dep_t_val,
+                    arrival_time=arr_t_val,
+                    origin=origin_station["name"],
+                    destination=dest_station["name"],
+                    date=date,
+                    total_available_seats=tot,
+                    class_breakdown=cls_bd,
+                    car_breakdown=car_bd,
+                    price=min_p,
+                    currency=curr,
+                    booking_url=self.BOOKING_URL,
+                    operator="TCDD Taşımacılık",
+                    notes=f"Available seats on {dep_t_val} route" if tot > 0 else "Sold Out"
+                ))
+
+        return sorted(services, key=lambda s: s.departure_time or "")
 
     def _match_time_filter(self, dep_time: str, filter_str: str) -> bool:
         if not dep_time or not filter_str:

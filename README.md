@@ -12,7 +12,7 @@ Manually refreshing ticketing websites over and over is tedious and time-consumi
 
 1. **Zero Cloud Dependencies**: Runs directly on your computer. Your search queries, travel plans, and credentials never leave your machine.
 2. **Multi-Channel Alerts**: Sends instant alerts via native desktop notifications, audio chimes, WhatsApp messages, or email.
-3. **Dual Interface**: Includes both an interactive terminal wizard and a clean web dashboard that runs locally in your browser.
+3. **Interactive Terminal Interface**: Clean step-by-step interactive wizard and direct command-line control.
 4. **Smart Radar Engine**: Built with polite polling intervals and randomized jitter to protect your IP from rate limits.
 
 ---
@@ -44,27 +44,9 @@ pip install -e .
 
 ## Getting Started
 
-You can use NotifySeat either through your web browser or directly from your terminal.
+### 1. Interactive Terminal Wizard
 
-### 1. Web Dashboard (Recommended)
-
-To start the local web interface:
-
-```bash
-notifyseat gui
-```
-
-![NotifySeat Web GUI Dashboard](docs/screenshots/gui_preview.png)
-
-This launches a local dashboard at `http://127.0.0.1:8080` in your default browser. From the dashboard, you can:
-- Add new transport routes to monitor
-- View live availability and train wagon details in real-time
-- Configure WhatsApp and email notification channels
-- Pause, resume, or delete tracking tasks
-
-### 2. Interactive Terminal Wizard
-
-If you prefer the command line, launch the interactive step-by-step wizard:
+Launch the interactive step-by-step wizard to set up a route:
 
 ```bash
 notifyseat track -i
@@ -105,7 +87,7 @@ notifyseat test-notify desktop
 Receive instant text messages directly on your phone the second a seat opens up. NotifySeat uses the free CallMeBot gateway for WhatsApp delivery.
 
 To set up WhatsApp:
-1. Run `notifyseat config` in your terminal or open the Settings tab in the Web GUI.
+1. Run `notifyseat config` in your terminal.
 2. Follow the prompt to activate the free bot gateway on WhatsApp.
 3. Save your phone number and API key.
 
@@ -119,7 +101,7 @@ Receive formatted email alerts containing route information, available seat coun
 
 To use Gmail:
 1. Generate an App Password in your Google Account security settings.
-2. Enter your email address and App Password in the Web GUI Settings.
+2. Enter your email address and App Password via `notifyseat config`.
 
 You can test email delivery with:
 ```bash
@@ -132,7 +114,6 @@ notifyseat test-notify email
 
 | Command | Description |
 |---|---|
-| `notifyseat gui` | Starts the local web dashboard server |
 | `notifyseat track -i` | Opens the interactive route setup wizard |
 | `notifyseat track --from "Istanbul" --to "Ankara" --date 2026-09-15` | Adds a route to track via command-line flags |
 | `notifyseat list` | Lists all active and paused tracking routes |

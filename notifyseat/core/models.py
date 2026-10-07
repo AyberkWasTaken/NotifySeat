@@ -1,5 +1,5 @@
 """Core data models for NotifySeat."""
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, fields
 from enum import Enum
 from typing import List, Dict, Optional, Any
 from datetime import datetime
@@ -155,7 +155,9 @@ class TrackingTask:
                 clean_data["last_service_info"] = json.loads(clean_data["last_service_info"])
             except Exception:
                 clean_data["last_service_info"] = None
-        return cls(**clean_data)
+        valid_fields = {f.name for f in fields(cls)}
+        filtered = {k: v for k, v in clean_data.items() if k in valid_fields}
+        return cls(**filtered)
 
 
 @dataclass
