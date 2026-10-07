@@ -40,10 +40,18 @@ def print_banner():
         print("\n=== NotifySeat - Local Seat Availability Notifier ===\n")
 
 
-def cmd_list(db: Database):
+def cmd_list(db: Database, config_mgr: Optional[ConfigManager] = None):
+    if sys.stdin.isatty():
+        from notifyseat.cli.interactive import interactive_task_manager
+        interactive_task_manager(db, config_mgr)
+    else:
+        cmd_list_static(db)
+
+
+def cmd_list_static(db: Database):
     tasks = db.list_tasks()
     if not tasks:
-        print("\nNo tracking routes found. Create one with: python3 main.py track\n")
+        print("\nNo tracking routes found. Create one with: notifyseat track\n")
         return
 
     if HAS_RICH and console:
@@ -80,7 +88,7 @@ def cmd_list(db: Database):
                 last_checked
             )
         console.print(table)
-        console.print("[dim]Commands: 'notifyseat check <id>' | 'notifyseat delete <id>' | 'notifyseat pause <id>'[/dim]\n")
+        console.print("[dim]Manage routes interactively with: 'notifyseat list'[/dim]\n")
     else:
         print("\n--- Monitored Routes ---")
         for t in tasks:
@@ -186,7 +194,7 @@ def cmd_check_now(db: Database, config_mgr: ConfigManager, task_id: Optional[str
     else:
         tasks = db.list_tasks(status=TaskStatus.ACTIVE) or db.list_tasks()
         if not tasks:
-            print("✖ No tasks found in database. Create one with: python3 main.py track")
+            print("✖ No tasks found in database. Create one with: notifyseat track")
             return
 
     cfg = config_mgr.get()
@@ -352,14 +360,40 @@ def cmd_config(config_mgr: ConfigManager):
 def cmd_test_notify(config_mgr: ConfigManager, channel: Optional[str] = None):
     cfg = config_mgr.get()
     mgr = NotificationManager(cfg)
-    
+
+    if not channel and sys.stdin.isatty():
+        from notifyseat.cli.interactive import prompt_choice
+
+        wa_detail = f"({cfg.whatsapp.phone_number})" if cfg.whatsapp.enabled and cfg.whatsapp.phone_number else "(Not Configured)"
+        em_detail = f"({cfg.email.recipient_email})" if cfg.email.enabled and cfg.email.recipient_email else "(Not Configured)"
+
+        options = [
+            f"📱 WhatsApp (CallMeBot) {wa_detail}",
+            f"📧 Email (SMTP) {em_detail}",
+            "🔊 Native Desktop Notification & Audio Chime (Ready)",
+            "⚡ Test All Configured Channels",
+            "🚪 Cancel / Exit"
+        ]
+        sel = prompt_choice("Which notification channel would you like to test?", options, default_idx=0)
+        if sel == 0:
+            channel = "whatsapp"
+        elif sel == 1:
+            channel = "email"
+        elif sel == 2:
+            channel = "desktop"
+        elif sel == 3:
+            channel = None  # Proceed to test_all
+        else:
+            print("\nOperation cancelled.\n")
+            return
+
     if channel:
         print(f"\nTesting notification channel: '{channel}'...")
         success = mgr.test_channel(channel)
         if success:
             print(f"\033[1;32m✔ [{channel.upper()}] Test notification was SUCCESSFUL!\033[0m\n")
         else:
-            print(f"\033[1;31m✖ [{channel.upper()}] Test notification failed. Check credentials with 'python3 main.py config'.\033[0m\n")
+            print(f"\033[1;31m✖ [{channel.upper()}] Test notification failed. Check credentials via 'notifyseat config'.\033[0m\n")
     else:
         print("\n\033[1;36m==================================================\033[0m")
         print("\033[1;36m        ⚡ Testing Notification Channels          \033[0m")
@@ -371,9 +405,9 @@ def cmd_test_notify(config_mgr: ConfigManager, channel: Optional[str] = None):
                 if data["success"]:
                     print(f"  \033[1;32m✔ [{ch.upper()}]\033[0m {label}: \033[1;32mSUCCESSFUL (Delivered!)\033[0m")
                 else:
-                    print(f"  \033[1;31m✖ [{ch.upper()}]\033[0m {label}: \033[1;31mFAILED (Check credentials via 'python3 main.py config')\033[0m")
+                    print(f"  \033[1;31m✖ [{ch.upper()}]\033[0m {label}: \033[1;31mFAILED (Check credentials via 'notifyseat config')\033[0m")
             else:
-                print(f"  \033[1;30m⚪ [{ch.upper()}]\033[0m {label}: \033[2mDisabled (Run 'python3 main.py config' to enable)\033[0m")
+                print(f"  \033[1;30m⚪ [{ch.upper()}]\033[0m {label}: \033[2mDisabled (Run 'notifyseat config' to enable)\033[0m")
         print()
 
 
@@ -398,10 +432,6 @@ def main():
     track_p.add_argument("--channels", default="desktop", help="Comma-separated channels: desktop,email,whatsapp")
     track_p.add_argument("--interval", type=int, default=90, help="Check interval in seconds (default 90)")
 
-    # check
-    chk_p = subparsers.add_parser("check", help="Trigger an immediate live check for a task (or all active tasks)")
-    chk_p.add_argument("task_id", nargs="?", default=None, help="Task ID to check (optional, checks all active if omitted)")
-
     # logs / history
     logs_p = subparsers.add_parser("logs", help="View route check & scan history")
     logs_p.add_argument("-n", "--limit", type=int, default=30, help="Number of recent logs to show (default 30)")
@@ -415,19 +445,11 @@ def main():
     subparsers.add_parser("config", help="Configure Email and WhatsApp alerts (auto-opens browser)")
     subparsers.add_parser("notify-setup", help="Alias for config")
 
-    # test-notify
+    # test-notify / notify-test
     test_p = subparsers.add_parser("test-notify", help="Test active notification channels")
     test_p.add_argument("channel", nargs="?", default=None, choices=["desktop", "email", "whatsapp", "sms"], help="Optional specific channel to test")
-
-    # delete
-    del_p = subparsers.add_parser("delete", help="Delete a tracking task")
-    del_p.add_argument("task_id", help="Task ID to delete")
-
-    # pause / resume
-    p_p = subparsers.add_parser("pause", help="Pause a tracking task")
-    p_p.add_argument("task_id", help="Task ID")
-    r_p = subparsers.add_parser("resume", help="Resume a tracking task")
-    r_p.add_argument("task_id", help="Task ID")
+    test_alias = subparsers.add_parser("notify-test", help="Alias for test-notify")
+    test_alias.add_argument("channel", nargs="?", default=None, choices=["desktop", "email", "whatsapp", "sms"], help="Optional specific channel to test")
 
     args = parser.parse_args()
 
@@ -436,50 +458,29 @@ def main():
 
     if not args.command or args.command in ("help", "-h", "--help"):
         print_banner()
-        cmd_list(db)
+        cmd_list_static(db)
         print("\nCommands available:")
-        print("  notifyseat track         ➔ Add a new route to monitor")
-        print("  notifyseat run           ➔ Start the background monitoring engine")
-        print("  notifyseat check [id]    ➔ Trigger immediate live check (or check all)")
-        print("  notifyseat logs          ➔ View route check & scan history")
-        print("  notifyseat list          ➔ View all configured routes")
-        print("  notifyseat config        ➔ Setup WhatsApp & Email alerts (auto-opens browser)")
-        print("  notifyseat test-notify   ➔ Test WhatsApp, Email, Desktop alerts")
-        print("  notifyseat delete <id>   ➔ Delete a task")
-        print("  notifyseat pause <id>    ➔ Pause monitoring for a task")
-        print("  notifyseat resume <id>   ➔ Resume monitoring for a task\n")
+        print("  notifyseat list          ➔ Rotaları listele ve yönet (Durdur/Başlat, Sil, Tara)")
+        print("  notifyseat track         ➔ Takip etmek için yeni rota ekle")
+        print("  notifyseat run           ➔ Arka plan radarını başlat")
+        print("  notifyseat logs          ➔ Tarama ve kontrol geçmişini görüntüle")
+        print("  notifyseat config        ➔ WhatsApp & Email bildirim ayarları")
+        print("  notifyseat test-notify   ➔ Bildirim kanallarını test et (veya 'notify-test')\n")
         return
 
     try:
         if args.command == "list":
-            cmd_list(db)
+            cmd_list(db, config_mgr)
         elif args.command == "track":
             cmd_track(db, args)
-        elif args.command == "check":
-            cmd_check_now(db, config_mgr, args.task_id)
         elif args.command in ("logs", "history"):
             cmd_logs(db, limit=getattr(args, "limit", 30))
         elif args.command in ("run", "start"):
             cmd_run(db, config_mgr, args)
         elif args.command in ("config", "notify-setup"):
             cmd_config(config_mgr)
-        elif args.command == "test-notify":
-            cmd_test_notify(config_mgr, args.channel)
-        elif args.command == "delete":
-            if db.delete_task(args.task_id):
-                print(f"✔ Task [{args.task_id}] deleted.")
-            else:
-                print(f"✖ Task [{args.task_id}] not found.")
-        elif args.command == "pause":
-            if db.update_task_status(args.task_id, TaskStatus.PAUSED):
-                print(f"✔ Task [{args.task_id}] paused.")
-            else:
-                print(f"✖ Task [{args.task_id}] not found.")
-        elif args.command == "resume":
-            if db.update_task_status(args.task_id, TaskStatus.ACTIVE):
-                print(f"✔ Task [{args.task_id}] resumed.")
-            else:
-                print(f"✖ Task [{args.task_id}] not found.")
+        elif args.command in ("test-notify", "notify-test"):
+            cmd_test_notify(config_mgr, getattr(args, "channel", None))
     except KeyboardInterrupt:
         print("\n\n\033[2mOperation cancelled.\033[0m\n")
         sys.exit(0)

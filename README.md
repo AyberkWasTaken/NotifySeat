@@ -116,15 +116,11 @@ notifyseat test-notify email
 |---|---|
 | `notifyseat track -i` | Opens the interactive route setup wizard |
 | `notifyseat track --from "Istanbul" --to "Ankara" --date 2026-09-15` | Adds a route to track via command-line flags |
-| `notifyseat list` | Lists all active and paused tracking routes |
-| `notifyseat check [task_id]` | Triggers an immediate live check for routes |
+| `notifyseat list` | Interactive route & task manager (F2: Pause/Resume, F3: Check, F4: Delete) |
 | `notifyseat run` | Starts the background monitoring radar |
 | `notifyseat logs` | Displays recent scan logs and seat findings |
 | `notifyseat config` | Opens the notification setup assistant |
-| `notifyseat test-notify [channel]` | Tests an alert channel (`desktop`, `whatsapp`, `email`) |
-| `notifyseat pause <task_id>` | Pauses a specific tracking task |
-| `notifyseat resume <task_id>` | Resumes a paused tracking task |
-| `notifyseat delete <task_id>` | Deletes a tracking task |
+| `notifyseat test-notify [channel]` | Tests an alert channel (`desktop`, `whatsapp`, `email` or 'notify-test') |
 
 ---
 
