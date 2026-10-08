@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="notifyseat",
-    version="1.0.0",
+    version="1.1.0",
     description="Local-First Transport Seat & Cancellation Notifier",
     author="Ayberk",
     packages=find_packages(),
